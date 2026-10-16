@@ -1,0 +1,28 @@
+# ============================================================
+# Anmaya Health Clinic — Python dependencies
+# ------------------------------------------------------------
+# Target runtime: Python 3.12
+# Install ONLY into the dedicated virtual environment
+# (C:\venvs\anmaya-clinic). NOT installed yet (Phase 0).
+# Versions are provisional ranges and will be pinned in Phase 2.
+# ============================================================
+
+# --- Core framework ---
+Django>=5.0,<5.2
+
+# --- Database driver (MySQL / MariaDB) ---
+# mysqlclient needs a C build toolchain on Windows; if that is a
+# blocker, switch to PyMySQL (adjust DB_ENGINE init accordingly).
+mysqlclient>=2.2,<3.0
+
+# --- Configuration / secrets loading ---
+python-dotenv>=1.0,<2.0
+
+# --- Development & testing ---
+pytest>=8.0,<9.0
+pytest-django>=4.8,<5.0
+coverage>=7.4,<8.0
+
+# --- Security tooling (optional, dev only) ---
+bandit>=1.7,<2.0
+pip-audit>=2.7,<3.0

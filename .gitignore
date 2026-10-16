@@ -1,0 +1,70 @@
+# ============================================================
+# Anmaya Health Clinic — Git ignore rules
+# ============================================================
+
+# --- Secrets / environment ---
+.env
+.env.*
+!.env.example
+
+# --- Python bytecode / build artifacts ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Virtual environments (project-local, if ever created) ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Django runtime output ---
+*.log
+local_settings.py
+
+# --- Local databases ---
+*.sqlite3
+*.sqlite3-journal
+*.db
+*.db-journal
+
+# --- Uploaded / generated content ---
+/media/
+/staticfiles/
+/static_root/
+*.generated.*
+
+# --- Test / coverage / lint caches ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+# --- IDE / editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+*~
+
+# --- OS generated ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# --- OneDrive / Office temp files ---
+~$*
+*.tmp
