@@ -27,9 +27,13 @@ before installation. Flagged as an open action (see §Open Issues).
 row locking.
 **Decision:** Target MySQL/InnoDB via `mysqlclient`. Tests run against MySQL so that
 `SELECT ... FOR UPDATE` and unique-constraint behavior are exercised realistically.
-**Consequences:** Requires a MySQL server for the test suite. If `mysqlclient` cannot be
-built on Windows, fall back to `PyMySQL` with an explicit driver bootstrap — document the
-swap in `decisions.md` and update `.env.example`.
+**Status (Phase 2):** `mysqlclient 2.3.0` installed successfully via a **prebuilt
+`cp312-win_amd64` wheel** — no C toolchain required, so no fallback needed. MySQL Server 8.0
+is installed and running on port 3306, but **no credentials were available** to this session,
+so the SQLite fallback was used for framework checks/tests. **MySQL migration validation
+remains BLOCKED** until credentials and the `care_clinic` database are provisioned.
+**Consequences:** Tests currently run against SQLite (documented). Re-run `migrate` and the
+suite against MySQL before delivery to satisfy this ADR.
 
 ## ADR-004 — Single custom `User` with a `role` field
 
@@ -81,12 +85,13 @@ clinical content (PII minimization).
 if time permits; email/SMS pluggable later. Not on the v1 critical path.
 **Consequences:** No external dependencies in v1; appointment flow stays self-contained.
 
-## ADR-010 — `requirements.txt` alignment (open action for Phase 2)
+## ADR-010 — `requirements.txt` alignment (RESOLVED in Phase 2)
 
 **Context:** Current pin `Django>=5.0,<5.2` conflicts with the mandated Django 5.2 LTS.
-**Decision:** Update to `Django>=5.2,<5.3` in Phase 2 (this phase did not modify
-dependency files per the planning-only restriction).
-**Consequences:** Must be fixed before `pip install -r requirements.txt`.
+**Decision:** Update to `Django>=5.2,<5.3` in Phase 2.
+**Status:** ✅ Resolved — `requirements.txt` now pins `Django>=5.2,<5.3`; **Django 5.2.18**
+installed and verified in the virtual environment.
+**Consequences:** No action remaining.
 
 ## ADR-011 — Human-readable booking reference
 

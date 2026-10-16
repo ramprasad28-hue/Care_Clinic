@@ -10,10 +10,10 @@ Each phase lists objective, tasks, deliverables, dependencies, and completion cr
 | # | Phase | Status |
 |---|---|---|
 | 0 | Workspace isolation | ✅ Complete |
-| 1 | Requirements & architecture | ✅ Complete (this phase) |
-| 2 | Django foundation | ⬜ Next |
-| 3 | Authentication & RBAC | ⬜ |
-| 4 | Doctor & speciality management | ⬜ |
+| 1 | Requirements & architecture | ✅ Complete |
+| 2 | Django foundation | ✅ Complete |
+| 3 | Authentication & RBAC | ✅ Complete |
+| 4 | Doctor & speciality management | ⬜ Next |
 | 5 | Appointment booking | ⬜ |
 | 6 | Dashboards | ⬜ |
 | 7 | Frontend implementation | ⬜ |
@@ -41,6 +41,20 @@ Groups/Permissions sync; role mixins/decorators; scoped querysets (`for_user`); 
 **Deliverables:** Working auth + enforced RBAC.
 **Dependencies:** Phase 2.
 **Completion criteria:** Unauthorized-access tests pass (see Testing strategy).
+
+**Status (implemented):**
+- Login/logout/password-reset via `accounts/urls.py`; email-labelled login form
+  (`EmailAuthenticationForm`); console email backend in development.
+- Patient-only registration (`PatientRegistrationForm`) — `role` forced to PATIENT server-side
+  and never read from input; new patients auto-logged-in.
+- `sync_roles` management command creates the four role **Groups**, grants a configurable
+  permission set, and reconciles membership with each user's `role`.
+- RBAC primitives in `accounts/permissions.py`: `role_required` decorator + `RoleRequiredMixin`
+  (anonymous → login redirect; wrong role → 403; superuser/admin always allowed).
+- 36 tests green (model, form, registration, auth flows, RBAC primitives, sync command).
+- **Deferred:** concrete `for_user` scoped querysets live on the domain models they protect
+  (`Appointment.objects.for_user`, `clinic` selectors) and are implemented in Phases 4–5; the
+  contract is documented in `accounts/permissions.py`.
 
 ## Phase 4 — Doctor & speciality management
 **Objective:** Catalog and scheduling configuration.

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Care_Clinic{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a class="brand" href="{% url 'home' %}">Care_Clinic</a>
+            <nav class="nav">
+                {% if user.is_authenticated %}
+                    <span class="nav-user">Signed in as {{ user.email }} <em>({{ user.get_role_display }})</em></span>
+                    {% if user.is_staff %}
+                        <a href="{% url 'admin:index' %}">Admin</a>
+                    {% endif %}
+                    <form method="post" action="{% url 'accounts:logout' %}" class="inline-form">
+                        {% csrf_token %}
+                        <button type="submit" class="link-button">Log out</button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'accounts:login' %}">Log in</a>
+                    <a href="{% url 'accounts:register' %}">Register</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li class="message {{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>Care_Clinic — Clinic Appointment Management System</p>
+        </div>
+    </footer>
+</body>
+</html>

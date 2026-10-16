@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Register — Care_Clinic{% endblock %}
+
+{% block content %}
+<section class="auth-panel">
+    <h1>Create your patient account</h1>
+    <p class="muted">
+        Registration is for <strong>patients only</strong>. Doctor, receptionist, and
+        administrator accounts are created by an administrator.
+    </p>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Register</button>
+    </form>
+
+    <p class="auth-links">
+        Already have an account? <a href="{% url 'accounts:login' %}">Log in</a>.
+    </p>
+</section>
+{% endblock %}

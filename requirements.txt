@@ -8,7 +8,8 @@
 # ============================================================
 
 # --- Core framework ---
-Django>=5.0,<5.2
+# ADR-002 / ADR-010: Django 5.2 LTS (long-term support).
+Django>=5.2,<5.3
 
 # --- Database driver (MySQL / MariaDB) ---
 # mysqlclient needs a C build toolchain on Windows; if that is a
