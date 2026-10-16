@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Anmaya Health Clinic — Appointment Management System
 
 Recruitment task for **Anmaya Health Technologies Private Limited**:
@@ -81,3 +82,6 @@ Copy-Item .env.example .env   # then edit values
 7. Frontend implementation
 8. Testing & security
 9. Submission preparation
+=======
+# Care_Clinic
+>>>>>>> origin/main
