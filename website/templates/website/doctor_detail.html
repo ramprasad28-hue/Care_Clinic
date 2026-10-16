@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Dr. {{ doctor.user.get_full_name }} — Care_Clinic{% endblock %}
+
+{% block content %}
+<p class="breadcrumb">
+    <a href="{% url 'doctor_list' %}">Doctors</a> /
+    <a href="{{ doctor.speciality.get_absolute_url }}">{{ doctor.speciality.name }}</a> /
+    Dr. {{ doctor.user.get_full_name }}
+</p>
+
+<h1>Dr. {{ doctor.user.get_full_name }}</h1>
+<p class="lead">{{ doctor.speciality.name }}{% if doctor.qualification %} · {{ doctor.qualification }}{% endif %}</p>
+
+<dl class="detail-list">
+    {% if doctor.registration_number %}<dt>Registration no.</dt><dd>{{ doctor.registration_number }}</dd>{% endif %}
+    {% if doctor.consultation_fee %}<dt>Consultation fee</dt><dd>₹{{ doctor.consultation_fee }}</dd>{% endif %}
+    <dt>Accepting appointments</dt><dd>{% if doctor.is_accepting_appointments %}Yes{% else %}No{% endif %}</dd>
+</dl>
+
+{% if doctor.bio %}
+    <h2>About</h2>
+    <p>{{ doctor.bio }}</p>
+{% endif %}
+
+<h2>Weekly availability</h2>
+{% if doctor.availability_rules.exists %}
+    <table class="data-table">
+        <thead>
+            <tr><th>Day</th><th>Start</th><th>End</th><th>Slot length</th></tr>
+        </thead>
+        <tbody>
+            {% for rule in doctor.availability_rules.all %}
+                {% if rule.is_active %}
+                <tr>
+                    <td>{{ rule.get_weekday_display }}</td>
+                    <td>{{ rule.start_time|time:"H:i" }}</td>
+                    <td>{{ rule.end_time|time:"H:i" }}</td>
+                    <td>{{ rule.effective_slot_length_minutes }} min</td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="muted">Availability details are not published yet.</p>
+{% endif %}
+
+<p class="muted">Online booking arrives in a later phase.</p>
+{% endblock %}

@@ -12,7 +12,13 @@
         <div class="container header-inner">
             <a class="brand" href="{% url 'home' %}">Care_Clinic</a>
             <nav class="nav">
+                <a href="{% url 'speciality_list' %}">Specialities</a>
+                <a href="{% url 'doctor_list' %}">Doctors</a>
                 {% if user.is_authenticated %}
+                    {% if user.is_doctor %}
+                        <a href="{% url 'clinic:availability_list' %}">My availability</a>
+                        <a href="{% url 'clinic:leave_list' %}">My leave</a>
+                    {% endif %}
                     <span class="nav-user">Signed in as {{ user.email }} <em>({{ user.get_role_display }})</em></span>
                     {% if user.is_staff %}
                         <a href="{% url 'admin:index' %}">Admin</a>

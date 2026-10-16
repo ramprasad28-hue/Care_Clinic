@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Doctors — Care_Clinic{% endblock %}
+
+{% block content %}
+<h1>Doctors</h1>
+
+<form method="get" class="filter-bar">
+    <label for="speciality">Filter by speciality</label>
+    <select name="speciality" id="speciality" onchange="this.form.submit()">
+        <option value="">All specialities</option>
+        {% for speciality in specialities %}
+            <option value="{{ speciality.slug }}"
+                {% if speciality.slug == selected_speciality %}selected{% endif %}>
+                {{ speciality.name }}
+            </option>
+        {% endfor %}
+    </select>
+    <noscript><button type="submit" class="btn btn-secondary">Filter</button></noscript>
+</form>
+
+{% if doctors %}
+    <ul class="card-grid">
+        {% for doctor in doctors %}
+            <li class="card">
+                <a class="card-title" href="{{ doctor.get_absolute_url }}">Dr. {{ doctor.user.get_full_name }}</a>
+                <p class="muted">{{ doctor.speciality.name }}{% if doctor.qualification %} · {{ doctor.qualification }}{% endif %}</p>
+                <a class="btn btn-secondary" href="{{ doctor.get_absolute_url }}">View profile</a>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="muted">No doctors match this filter.</p>
+{% endif %}
+{% endblock %}

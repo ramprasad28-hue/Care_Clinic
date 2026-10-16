@@ -23,9 +23,35 @@ User = get_user_model()
 # Only entries whose Permission exists are applied. Keep this list aligned with
 # the RBAC matrix in docs/architecture.md §6 as features land.
 ROLE_PERMISSIONS = {
-    User.Role.PATIENT: ("Patient", []),
-    User.Role.DOCTOR: ("Doctor", []),
-    User.Role.RECEPTIONIST: ("Receptionist", []),
+    User.Role.PATIENT: (
+        "Patient",
+        [
+            "clinic.view_speciality",
+            "clinic.view_doctor",
+        ],
+    ),
+    User.Role.DOCTOR: (
+        "Doctor",
+        [
+            "clinic.view_speciality",
+            "clinic.view_doctor",
+            "clinic.add_availabilityrule",
+            "clinic.change_availabilityrule",
+            "clinic.delete_availabilityrule",
+            "clinic.view_availabilityrule",
+            "clinic.add_doctorleave",
+            "clinic.change_doctorleave",
+            "clinic.delete_doctorleave",
+            "clinic.view_doctorleave",
+        ],
+    ),
+    User.Role.RECEPTIONIST: (
+        "Receptionist",
+        [
+            "clinic.view_speciality",
+            "clinic.view_doctor",
+        ],
+    ),
     User.Role.ADMIN: (
         "Administrator",
         [
@@ -33,6 +59,22 @@ ROLE_PERMISSIONS = {
             "accounts.change_user",
             "accounts.delete_user",
             "accounts.view_user",
+            "clinic.add_speciality",
+            "clinic.change_speciality",
+            "clinic.delete_speciality",
+            "clinic.view_speciality",
+            "clinic.add_doctor",
+            "clinic.change_doctor",
+            "clinic.delete_doctor",
+            "clinic.view_doctor",
+            "clinic.add_availabilityrule",
+            "clinic.change_availabilityrule",
+            "clinic.delete_availabilityrule",
+            "clinic.view_availabilityrule",
+            "clinic.add_doctorleave",
+            "clinic.change_doctorleave",
+            "clinic.delete_doctorleave",
+            "clinic.view_doctorleave",
         ],
     ),
 }

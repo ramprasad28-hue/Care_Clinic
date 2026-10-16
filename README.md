@@ -3,10 +3,12 @@
 Recruitment task for **Anmaya Health Technologies Private Limited**:
 a clinic web application with **appointment booking** and **Role-Based Access Control (RBAC)**.
 
-> **Current status: Phase 3 — Authentication & RBAC (complete).**
-> The Django project, custom email-based user model, authentication (login / logout /
-> password reset), patient-only registration, role groups, and RBAC primitives are in
-> place with 36 passing tests. Public site, booking, and dashboards arrive in later phases.
+> **Current status: Phase 4 — Doctor & Speciality Management (complete).**
+> Builds on the Django project, custom email-based user model, authentication (login /
+> logout / password reset), patient-only registration, role groups, and RBAC primitives.
+> Phase 4 adds the clinic catalog (`clinic` app) and the public site (`website` app):
+> specialities, doctors, doctor self-service availability & leave, and admin — with
+> **94 passing tests**. Appointment booking and dashboards arrive in later phases.
 
 ## Purpose
 
@@ -39,7 +41,7 @@ No React, Next.js, or microservices — a straightforward, server-rendered Djang
 | Virtual environment | `C:\venvs\anmaya-clinic` (deliberately **outside** OneDrive) |
 | Git repository root | This folder (dedicated repository, branch `main`) |
 
-## Project structure (through Phase 3)
+## Project structure (through Phase 4)
 
 ```
 config/
@@ -49,6 +51,13 @@ accounts/    models.py · managers.py · forms.py · views.py · permissions.py
              urls.py · admin.py · tests.py · migrations/
              management/commands/sync_roles.py
              templates/accounts/  login · register · logged_out · password_reset_*
+clinic/      models.py (Speciality, Doctor, AvailabilityRule, DoctorLeave) · forms.py
+             views.py · urls.py · admin.py · selectors.py · tests.py · migrations/
+             management/commands/seed_clinic.py
+             templates/clinic/  availability_* · leave_*
+website/     views.py · urls.py · apps.py · tests.py
+             templates/website/  speciality_list · speciality_detail
+                                 doctor_list · doctor_detail
 templates/   base.html · home.html
 static/      css/styles.css
 manage.py · pytest.ini · requirements.txt · .env.example · docs/
@@ -133,10 +142,12 @@ python manage.py makemigrations --check --dry-run   # assert no missing migratio
 ```powershell
 python manage.py createsuperuser   # login is by email
 python manage.py sync_roles        # create role Groups + permissions (idempotent)
+python manage.py seed_clinic       # create synthetic specialities + doctors (idempotent)
 ```
 
 Privileged roles (Doctor/Receptionist/Admin) are provisioned by an administrator — never
-through public registration.
+through public registration. `seed_clinic` also provisions three **DOCTOR-role demo users**
+with unusable passwords (they cannot log in) purely to populate the public catalog.
 
 ### 7. Authentication & RBAC (Phase 3)
 
@@ -152,14 +163,44 @@ RBAC primitives live in `accounts/permissions.py`:
 users are redirected to login, wrong-role users get HTTP 403, and superusers/admins always
 pass. `python manage.py sync_roles [--dry-run]` keeps role groups and permissions aligned.
 
-### 8. Run tests
+### 8. Public site & clinic management (Phase 4)
+
+**Public pages** (`website` app, anonymous access):
+
+| Route | Purpose |
+|---|---|
+| `/` | Home — active specialities and accepting doctors |
+| `/specialities/` · `/specialities/<slug>/` | List / detail of **active** specialities |
+| `/doctors/` (optionally `?speciality=<slug>`) | List of **accepting** doctors, filterable |
+| `/doctors/<slug>/` | Doctor detail with weekly availability |
+
+Inactive specialities, non-accepting or unknown doctors, and unknown slugs return **404**.
+Only doctors whose user and speciality are active and who are accepting appointments are
+shown (`Doctor.objects.public()`).
+
+**Doctor self-service** (`clinic` app, DOCTOR role only) — ownership is enforced server-side,
+so a doctor can only ever see or change their own rows:
+
+| Route | Purpose |
+|---|---|
+| `/clinic/doctor/availability/` | List weekly availability windows |
+| `/clinic/doctor/availability/add/` · `<pk>/edit/` · `<pk>/delete/` | Manage a window |
+| `/clinic/doctor/leave/` | List leave periods |
+| `/clinic/doctor/leave/add/` · `<pk>/delete/` | Manage leave |
+
+Availability windows are validated so end time is after start time and windows never overlap;
+leave end date cannot precede its start date. `Speciality`/`Doctor` are managed in the Django
+admin by the **Administrator** role; `AvailabilityRule`/`DoctorLeave` in the admin are scoped
+to the logged-in doctor.
+
+### 9. Run tests
 
 ```powershell
 python manage.py test              # Django test runner
 pytest                             # pytest-django (config in pytest.ini)
 ```
 
-### 9. Start the development server
+### 10. Start the development server
 
 ```powershell
 python manage.py runserver
@@ -173,14 +214,14 @@ python manage.py runserver
 | [`docs/requirements.md`](docs/requirements.md) | Confirmed/proposed features, out-of-scope, open employer questions |
 | [`docs/architecture.md`](docs/architecture.md) | App structure, booking workflow, RBAC matrix, security, frontend direction |
 | [`docs/data-model.md`](docs/data-model.md) | Entities, ERD (Mermaid), constraints, status state machine |
-| [`docs/decisions.md`](docs/decisions.md) | Architecture Decision Records (ADR-001…012) |
+| [`docs/decisions.md`](docs/decisions.md) | Architecture Decision Records (ADR-001…015) |
 | [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) | Phases, testing strategy, security checklist |
 
 ## Planned Django apps
 
-`accounts` (auth/roles — **implemented**) · `clinic` (doctors/specialities/availability) ·
-`appointments` (slots/bookings/services) · `dashboards` · `website` (public pages) ·
-`notifications` (optional, deferred) — plus the `config` project package.
+`accounts` (auth/roles) · `clinic` (doctors/specialities/availability) ·
+`website` (public pages) — **all implemented** — then `appointments` (slots/bookings/
+services) · `dashboards` · `notifications` (optional, deferred) — plus the `config` package.
 
 ## Safety notices
 
@@ -195,7 +236,7 @@ python manage.py runserver
 1. Requirements & architecture — **done**
 2. Django foundation — **done**
 3. Authentication & RBAC — **done**
-4. Doctor & speciality management — next
+4. Doctor & speciality management — **done**
 5. Appointment booking
 6. Dashboards
 7. Frontend implementation

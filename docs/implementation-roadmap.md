@@ -13,7 +13,7 @@ Each phase lists objective, tasks, deliverables, dependencies, and completion cr
 | 1 | Requirements & architecture | ✅ Complete |
 | 2 | Django foundation | ✅ Complete |
 | 3 | Authentication & RBAC | ✅ Complete |
-| 4 | Doctor & speciality management | ⬜ Next |
+| 4 | Doctor & speciality management | ✅ Complete |
 | 5 | Appointment booking | ⬜ |
 | 6 | Dashboards | ⬜ |
 | 7 | Frontend implementation | ⬜ |
@@ -63,6 +63,25 @@ public listing/detail pages; availability rules UI for doctors.
 **Deliverables:** Managed catalog with public pages.
 **Dependencies:** Phase 3.
 **Completion criteria:** Admin can CRUD; public pages render; leave blocks slots.
+
+**Status (implemented):**
+- New `clinic` app: `Speciality`, `Doctor` (OneToOne to a DOCTOR-role user), `AvailabilityRule`,
+  `DoctorLeave`, with `CheckConstraint`/`UniqueConstraint` integrity and `full_clean()` on save.
+- New `website` app: public home, speciality list/detail, doctor list (filter by speciality)
+  and doctor detail. Only **active specialities** and **accepting doctors** are shown
+  (`Doctor.objects.public()`); inactive/non-accepting/unknown → 404.
+- Doctor self-service for availability & leave, with **ownership enforced server-side**
+  (scoped querysets → 404 for other doctors' rows; submitted doctor id ignored).
+- Admin: `Speciality`/`Doctor` restricted to the Administrator role; `AvailabilityRule`/
+  `DoctorLeave` scoped to the logged-in doctor (queryset + object permissions + forced owner).
+- `seed_clinic` command creates 5 specialities and 3 doctors (idempotent, synthetic data).
+- `sync_roles` extended to grant clinic permissions to the four role groups.
+- 94 tests green total (36 Phase 2/3 + 58 new) under both `manage.py test` and `pytest`.
+- **DB note:** migrations/tests ran on the documented **SQLite fallback**; MySQL validation
+  remains blocked per ADR-003.
+- **Deferred to Phase 5:** "leave blocks slots" is enforced when concrete slots are
+  materialized/booked (no slot materialization exists yet).
+
 
 ## Phase 5 — Appointment booking (core)
 **Objective:** Race-safe booking end to end.

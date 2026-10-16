@@ -107,6 +107,37 @@ Admin (protected flow or management command).
 **Consequences:** No self-service privilege escalation; tests must prove `role` from input
 is ignored.
 
+## ADR-013 — `Doctor.speciality` is a single foreign key (Phase 4)
+
+**Context:** `docs/data-model.md` models a doctor as belonging to one speciality; the
+brief speaks of "Dr. Aswin — Cardiology, Dermatology" as an example, which could imply
+many-to-many.
+**Decision:** Keep a **single `ForeignKey(Speciality, on_delete=PROTECT)`**, matching the
+approved data model. A doctor has exactly one speciality.
+**Consequences:** Simpler filtering, admin, and public pages; speciality lists are cheap
+(`speciality.doctors`). If multi-speciality doctors are later required, migrate to an
+explicit through-model — deferred until requested (YAGNI). `PROTECT` prevents deleting a
+speciality that still has doctors.
+
+## ADR-014 — Justified additions to `Doctor`: `slug` and `consultation_fee` (Phase 4)
+
+**Context:** The data model lists the doctor's core fields; the public listing needs stable,
+readable URLs and the appointment flow will need a fee.
+**Decision:** Add `slug` (unique, auto-generated from the doctor's name via `unique_slug()`)
+and `consultation_fee` (`Decimal`, nullable — not all clinics charge per-consultation).
+**Consequences:** Public doctor URLs are human-readable (`/doctors/aswin-kumar/`) instead of
+pks. `consultation_fee` is optional so it can remain blank. Both are additive and do not
+contradict the model.
+
+## ADR-015 — Deliberately omit `Doctor.profile_image` in v1 (Phase 4)
+
+**Context:** A profile photo was considered for doctor pages.
+**Decision:** **Omit** `profile_image` for v1.
+**Consequences:** No image-handling pipeline and, importantly, **no Pillow dependency**,
+keeping the dependency set minimal and the reviewer setup simple. The UI uses a text/initial
+avatar. Revisit only if the employer requests photos.
+
+
 ---
 
 ## Open issues requiring employer confirmation

@@ -5,15 +5,39 @@
 {% block content %}
 <section class="hero">
     <h1>Care_Clinic</h1>
-    <p class="lead">Clinic Appointment Management System — Django foundation is running.</p>
+    <p class="lead">Find the right speciality and doctor, and book your visit with confidence.</p>
+    <p><a class="btn btn-primary" href="{% url 'doctor_list' %}">Browse doctors</a></p>
 </section>
 
-<section class="status">
-    <h2>Foundation status</h2>
-    <ul>
-        <li>Django project structure: <strong>ready</strong></li>
-        <li>Custom user model (<code>accounts.User</code>): <strong>installed</strong></li>
-        <li>Public site, booking, and dashboards: <strong>coming in later phases</strong></li>
-    </ul>
+<section>
+    <h2>Specialities</h2>
+    {% if specialities %}
+        <ul class="card-grid">
+            {% for speciality in specialities %}
+                <li class="card">
+                    <a class="card-title" href="{{ speciality.get_absolute_url }}">{{ speciality.name }}</a>
+                    <p class="muted">{{ speciality.description|default:"—"|truncatewords:18 }}</p>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">No specialities are available yet.</p>
+    {% endif %}
+</section>
+
+<section>
+    <h2>Our doctors</h2>
+    {% if doctors %}
+        <ul class="card-grid">
+            {% for doctor in doctors %}
+                <li class="card">
+                    <a class="card-title" href="{{ doctor.get_absolute_url }}">Dr. {{ doctor.user.get_full_name }}</a>
+                    <p class="muted">{{ doctor.speciality.name }}{% if doctor.qualification %} · {{ doctor.qualification }}{% endif %}</p>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">No doctors are available yet.</p>
+    {% endif %}
 </section>
 {% endblock %}

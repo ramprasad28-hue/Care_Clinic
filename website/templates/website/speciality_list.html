@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Specialities — Care_Clinic{% endblock %}
+
+{% block content %}
+<h1>Specialities</h1>
+
+{% if specialities %}
+    <ul class="card-grid">
+        {% for speciality in specialities %}
+            <li class="card">
+                <a class="card-title" href="{{ speciality.get_absolute_url }}">{{ speciality.name }}</a>
+                <p class="muted">{{ speciality.description|default:"—"|truncatewords:20 }}</p>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="muted">No specialities are available yet.</p>
+{% endif %}
+{% endblock %}

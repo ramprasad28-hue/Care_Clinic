@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}My leave — Care_Clinic{% endblock %}
+
+{% block content %}
+<h1>My leave</h1>
+<p class="muted">Date ranges during which you are unavailable.</p>
+
+<p><a class="btn btn-primary" href="{% url 'clinic:leave_add' %}">Add leave</a></p>
+
+{% if leaves %}
+    <table class="data-table">
+        <thead>
+            <tr><th>Start</th><th>End</th><th>Reason</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            {% for leave in leaves %}
+                <tr>
+                    <td>{{ leave.start_date|date:"Y-m-d" }}</td>
+                    <td>{{ leave.end_date|date:"Y-m-d" }}</td>
+                    <td>{{ leave.reason|default:"—" }}</td>
+                    <td class="row-actions">
+                        <a class="danger" href="{% url 'clinic:leave_delete' leave.pk %}">Delete</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="muted">You have no leave recorded.</p>
+{% endif %}
+{% endblock %}

@@ -163,3 +163,97 @@ main { padding: 2.5rem 0; }
 .btn-primary:hover { background: #0b5c5f; }
 
 .auth-links { margin-top: 1.25rem; font-size: .92rem; }
+
+/* --- Catalog: cards, tables, filter bar (Phase 4) --- */
+section { margin-bottom: 2rem; }
+
+.card-grid {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+}
+
+.card-title {
+    display: block;
+    font-weight: 700;
+    color: var(--navy);
+    text-decoration: none;
+    margin-bottom: .35rem;
+}
+
+.card-title:hover { color: var(--teal); }
+
+.btn-secondary {
+    background: #edf2f7;
+    color: var(--navy);
+    text-decoration: none;
+}
+.btn-secondary:hover { background: #e2e8f0; }
+
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+    margin: 1rem 0 1.5rem;
+}
+
+.filter-bar label { font-weight: 600; }
+
+.filter-bar select {
+    padding: .5rem .6rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    font: inherit;
+    background: #fff;
+}
+
+.breadcrumb { font-size: .9rem; color: #718096; }
+.breadcrumb a { color: var(--teal); }
+
+.detail-list {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: .25rem 1rem;
+    margin: 1rem 0 1.5rem;
+}
+.detail-list dt { font-weight: 600; color: #4a5568; }
+.detail-list dd { margin: 0; }
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.data-table th,
+.data-table td {
+    text-align: left;
+    padding: .6rem .8rem;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.data-table thead th {
+    background: #f7fafc;
+    color: var(--navy);
+    font-size: .9rem;
+}
+
+.data-table tr:last-child td { border-bottom: 0; }
+
+.row-actions { display: flex; gap: .75rem; }
+.row-actions a { color: var(--teal); }
+.row-actions a.danger { color: #c53030; }

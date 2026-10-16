@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}{{ speciality.name }} — Care_Clinic{% endblock %}
+
+{% block content %}
+<p class="breadcrumb"><a href="{% url 'speciality_list' %}">Specialities</a> / {{ speciality.name }}</p>
+
+<h1>{{ speciality.name }}</h1>
+{% if speciality.description %}<p class="lead">{{ speciality.description }}</p>{% endif %}
+
+<h2>Doctors in this speciality</h2>
+{% if doctors %}
+    <ul class="card-grid">
+        {% for doctor in doctors %}
+            <li class="card">
+                <a class="card-title" href="{{ doctor.get_absolute_url }}">Dr. {{ doctor.user.get_full_name }}</a>
+                <p class="muted">{{ doctor.qualification }}</p>
+                <a class="btn btn-secondary" href="{{ doctor.get_absolute_url }}">View profile</a>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="muted">No doctors are currently available in this speciality.</p>
+{% endif %}
+{% endblock %}
