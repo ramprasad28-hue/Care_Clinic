@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Reschedule {{ appointment.reference }} — Care_Clinic{% endblock %}
+
+{% block content %}
+<p class="breadcrumb"><a href="{{ appointment.get_absolute_url }}">{{ appointment.reference }}</a> / Reschedule</p>
+
+<h1>Reschedule appointment</h1>
+<p class="lead">
+    Currently {{ appointment.date|date:"D j M Y" }} at {{ appointment.start_time|time:"H:i" }} with
+    Dr. {{ appointment.doctor.user.get_full_name }}.
+</p>
+
+{% if dates %}
+    <section>
+        <h2>Choose a new date</h2>
+        <ul class="date-nav">
+            {% for d in dates %}
+                <li>
+                    <a class="date-chip {% if d == selected_day %}is-active{% endif %}"
+                       href="?date={{ d|date:'Y-m-d' }}">{{ d|date:"D j M" }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section>
+        <h2>New slot on {{ selected_day|date:"D j M Y" }}</h2>
+        {% if slots %}
+            <form method="post" class="booking-form">
+                {% csrf_token %}
+                <input type="hidden" name="date" value="{{ selected_day|date:'Y-m-d' }}">
+                {{ form.slot.errors }}
+                <div class="slot-grid">
+                    {% for radio in form.slot %}
+                        <label class="slot-option">{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>
+                    {% endfor %}
+                </div>
+                <button type="submit" class="btn btn-primary">Confirm reschedule</button>
+            </form>
+        {% else %}
+            <p class="muted">No open slots on this date. Please pick another date.</p>
+        {% endif %}
+    </section>
+{% else %}
+    <p class="muted">No availability to reschedule into right now.</p>
+{% endif %}
+{% endblock %}

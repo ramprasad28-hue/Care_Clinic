@@ -3,12 +3,13 @@
 Recruitment task for **Anmaya Health Technologies Private Limited**:
 a clinic web application with **appointment booking** and **Role-Based Access Control (RBAC)**.
 
-> **Current status: Phase 4 — Doctor & Speciality Management (complete).**
+> **Current status: Phase 5 — Appointment Booking (complete).**
 > Builds on the Django project, custom email-based user model, authentication (login /
-> logout / password reset), patient-only registration, role groups, and RBAC primitives.
-> Phase 4 adds the clinic catalog (`clinic` app) and the public site (`website` app):
-> specialities, doctors, doctor self-service availability & leave, and admin — with
-> **94 passing tests**. Appointment booking and dashboards arrive in later phases.
+> logout / password reset), patient-only registration, role groups, RBAC primitives, the
+> clinic catalog (`clinic`), and the public site (`website`). Phase 5 adds the `appointments`
+> app: race-safe slot generation and booking, cancellation and rescheduling, a status state
+> machine, and patient/doctor appointment pages — with **159 passing tests** (one MySQL-only
+> concurrency test skipped on SQLite). Dashboards arrive in a later phase.
 
 ## Purpose
 
@@ -41,7 +42,7 @@ No React, Next.js, or microservices — a straightforward, server-rendered Djang
 | Virtual environment | `C:\venvs\anmaya-clinic` (deliberately **outside** OneDrive) |
 | Git repository root | This folder (dedicated repository, branch `main`) |
 
-## Project structure (through Phase 4)
+## Project structure (through Phase 5)
 
 ```
 config/
@@ -55,6 +56,12 @@ clinic/      models.py (Speciality, Doctor, AvailabilityRule, DoctorLeave) · fo
              views.py · urls.py · admin.py · selectors.py · tests.py · migrations/
              management/commands/seed_clinic.py
              templates/clinic/  availability_* · leave_*
+appointments/ models.py (AppointmentSlot, Appointment) · slot_generation.py · services.py
+             selectors.py · forms.py · views.py · urls.py · admin.py · tests.py
+             migrations/ · management/commands/generate_slots.py
+             templates/appointments/  appointment_list · appointment_detail
+                                      appointment_book · appointment_cancel
+                                      appointment_reschedule
 website/     views.py · urls.py · apps.py · tests.py
              templates/website/  speciality_list · speciality_detail
                                  doctor_list · doctor_detail
@@ -143,6 +150,7 @@ python manage.py makemigrations --check --dry-run   # assert no missing migratio
 python manage.py createsuperuser   # login is by email
 python manage.py sync_roles        # create role Groups + permissions (idempotent)
 python manage.py seed_clinic       # create synthetic specialities + doctors (idempotent)
+python manage.py generate_slots    # materialize bookable slots (idempotent; --days N)
 ```
 
 Privileged roles (Doctor/Receptionist/Admin) are provisioned by an administrator — never
@@ -193,14 +201,43 @@ leave end date cannot precede its start date. `Speciality`/`Doctor` are managed 
 admin by the **Administrator** role; `AvailabilityRule`/`DoctorLeave` in the admin are scoped
 to the logged-in doctor.
 
-### 9. Run tests
+### 9. Appointment booking (Phase 5)
+
+**`appointments` app** — concrete bookable slots generated from availability and bookings that
+flow through transactional services:
+
+| Route | Purpose |
+|---|---|
+| `/appointments/book/<doctor-slug>/` | Patient books a slot (optional `?date=YYYY-MM-DD`) |
+| `/appointments/` | Appointment list (`?scope=upcoming|past`), scoped to the user |
+| `/appointments/<reference>/` | Appointment detail (e.g. `CC-2026-000123`) |
+| `/appointments/<reference>/cancel/` | Confirm-and-cancel page |
+| `/appointments/<reference>/reschedule/` | Move a booking to another slot |
+
+- **Slot generation:** `generate_slots` materializes `AppointmentSlot` rows from active
+  `AvailabilityRule` windows over a rolling horizon, honoring the rule/doctor slot length and
+  skipping leave and past intervals. It is idempotent and preserves existing `BOOKED` slots.
+- **Race-safe booking:** every mutation runs in `transaction.atomic()` with
+  `select_for_update()` on the slot row. One active booking per slot is guaranteed by the
+  database (nullable `OneToOneField` + release-on-cancel — ADR-017), not an app-only check.
+- **Ownership:** all record lookups go through `Appointment.objects.for_user`, so an
+  unauthorized reference returns **404**. The actor's role is read from the session.
+- **Status state machine:** `REQUESTED → CONFIRMED → CHECKED_IN → COMPLETED`, plus `CANCELLED`
+  and `NO_SHOW`; illegal transitions are rejected. Cancelling never deletes the record — the
+  slot is released and history is kept. Patients may self-cancel/reschedule up to **24 h**
+  before the slot (staff, until it starts) — provisional (ADR-018).
+
+### 10. Run tests
 
 ```powershell
 python manage.py test              # Django test runner
 pytest                             # pytest-django (config in pytest.ini)
 ```
 
-### 10. Start the development server
+The MySQL-only concurrency test is skipped on SQLite; see
+[`docs/mysql-validation.md`](docs/mysql-validation.md) for the exact MySQL/InnoDB procedure.
+
+### 11. Start the development server
 
 ```powershell
 python manage.py runserver
@@ -214,14 +251,15 @@ python manage.py runserver
 | [`docs/requirements.md`](docs/requirements.md) | Confirmed/proposed features, out-of-scope, open employer questions |
 | [`docs/architecture.md`](docs/architecture.md) | App structure, booking workflow, RBAC matrix, security, frontend direction |
 | [`docs/data-model.md`](docs/data-model.md) | Entities, ERD (Mermaid), constraints, status state machine |
-| [`docs/decisions.md`](docs/decisions.md) | Architecture Decision Records (ADR-001…015) |
+| [`docs/decisions.md`](docs/decisions.md) | Architecture Decision Records (ADR-001…018) |
 | [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) | Phases, testing strategy, security checklist |
+| [`docs/mysql-validation.md`](docs/mysql-validation.md) | Exact MySQL/InnoDB validation + concurrency procedure |
 
 ## Planned Django apps
 
 `accounts` (auth/roles) · `clinic` (doctors/specialities/availability) ·
-`website` (public pages) — **all implemented** — then `appointments` (slots/bookings/
-services) · `dashboards` · `notifications` (optional, deferred) — plus the `config` package.
+`website` (public pages) · `appointments` (slots/bookings/services) — **all implemented** —
+then `dashboards` · `notifications` (optional, deferred) — plus the `config` package.
 
 ## Safety notices
 
@@ -237,7 +275,7 @@ services) · `dashboards` · `notifications` (optional, deferred) — plus the `
 2. Django foundation — **done**
 3. Authentication & RBAC — **done**
 4. Doctor & speciality management — **done**
-5. Appointment booking
+5. Appointment booking — **done**
 6. Dashboards
 7. Frontend implementation
 8. Testing & security

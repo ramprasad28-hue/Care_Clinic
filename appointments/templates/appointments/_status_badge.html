@@ -1,0 +1,15 @@
+{% if appointment.status == "REQUESTED" %}
+    <span class="status-badge status-requested">Requested</span>
+{% elif appointment.status == "CONFIRMED" %}
+    <span class="status-badge status-confirmed">Confirmed</span>
+{% elif appointment.status == "CHECKED_IN" %}
+    <span class="status-badge status-checked_in">Checked in</span>
+{% elif appointment.status == "COMPLETED" %}
+    <span class="status-badge status-completed">Completed</span>
+{% elif appointment.status == "CANCELLED" %}
+    <span class="status-badge status-cancelled">Cancelled</span>
+{% elif appointment.status == "NO_SHOW" %}
+    <span class="status-badge status-no_show">No show</span>
+{% else %}
+    <span class="status-badge">{{ appointment.get_status_display }}</span>
+{% endif %}

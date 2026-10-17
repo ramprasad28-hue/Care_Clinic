@@ -28,6 +28,8 @@ ROLE_PERMISSIONS = {
         [
             "clinic.view_speciality",
             "clinic.view_doctor",
+            "appointments.add_appointment",
+            "appointments.view_appointment",
         ],
     ),
     User.Role.DOCTOR: (
@@ -43,6 +45,9 @@ ROLE_PERMISSIONS = {
             "clinic.change_doctorleave",
             "clinic.delete_doctorleave",
             "clinic.view_doctorleave",
+            "appointments.view_appointment",
+            "appointments.change_appointment",
+            "appointments.view_appointmentslot",
         ],
     ),
     User.Role.RECEPTIONIST: (
@@ -50,6 +55,12 @@ ROLE_PERMISSIONS = {
         [
             "clinic.view_speciality",
             "clinic.view_doctor",
+            "appointments.view_appointment",
+            "appointments.add_appointment",
+            "appointments.change_appointment",
+            "appointments.view_appointmentslot",
+            "appointments.add_appointmentslot",
+            "appointments.change_appointmentslot",
         ],
     ),
     User.Role.ADMIN: (
@@ -75,6 +86,14 @@ ROLE_PERMISSIONS = {
             "clinic.change_doctorleave",
             "clinic.delete_doctorleave",
             "clinic.view_doctorleave",
+            "appointments.add_appointment",
+            "appointments.change_appointment",
+            "appointments.delete_appointment",
+            "appointments.view_appointment",
+            "appointments.add_appointmentslot",
+            "appointments.change_appointmentslot",
+            "appointments.delete_appointmentslot",
+            "appointments.view_appointmentslot",
         ],
     ),
 }

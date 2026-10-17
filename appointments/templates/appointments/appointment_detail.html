@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Appointment {{ appointment.reference }} — Care_Clinic{% endblock %}
+
+{% block content %}
+<p class="breadcrumb"><a href="{% url 'appointments:list' %}">Appointments</a> / {{ appointment.reference }}</p>
+
+<h1>Appointment {{ appointment.reference }}</h1>
+<p class="lead">{% include "appointments/_status_badge.html" with appointment=appointment %}</p>
+
+<dl class="detail-list">
+    <dt>Doctor</dt><dd>Dr. {{ appointment.doctor.user.get_full_name }} ({{ appointment.doctor.speciality.name }})</dd>
+    <dt>Patient</dt><dd>{{ appointment.patient.get_full_name }}</dd>
+    <dt>Date</dt><dd>{{ appointment.date|date:"D j M Y" }}</dd>
+    <dt>Time</dt><dd>{{ appointment.start_time|time:"H:i" }}–{{ appointment.end_time|time:"H:i" }}</dd>
+    {% if appointment.reason %}<dt>Reason</dt><dd>{{ appointment.reason }}</dd>{% endif %}
+    <dt>Booked</dt><dd>{{ appointment.created_at|date:"j M Y, H:i" }}</dd>
+    {% if appointment.cancelled_by %}
+        <dt>Cancelled by</dt><dd>{{ appointment.cancelled_by.get_full_name }}</dd>
+    {% endif %}
+    {% if appointment.cancellation_reason %}
+        <dt>Cancellation reason</dt><dd>{{ appointment.cancellation_reason }}</dd>
+    {% endif %}
+</dl>
+
+{% if can_cancel or can_reschedule %}
+    <div class="row-actions">
+        {% if can_reschedule %}
+            <a class="btn btn-secondary" href="{% url 'appointments:reschedule' appointment.reference %}">Reschedule</a>
+        {% endif %}
+        {% if can_cancel %}
+            <a class="btn btn-secondary danger" href="{% url 'appointments:cancel' appointment.reference %}">Cancel appointment</a>
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}

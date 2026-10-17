@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Appointments — Care_Clinic{% endblock %}
+
+{% block content %}
+<h1>Appointments</h1>
+
+{% if user.is_patient %}
+    <p class="muted">Your bookings. Use the doctor pages to book a new appointment.</p>
+{% endif %}
+
+<p class="filter-bar">
+    <a class="btn {% if scope != 'past' %}btn-primary{% else %}btn-secondary{% endif %}"
+       href="?scope=upcoming">Upcoming</a>
+    <a class="btn {% if scope == 'past' %}btn-primary{% else %}btn-secondary{% endif %}"
+       href="?scope=past">Past</a>
+</p>
+
+{% if appointments %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Reference</th><th>Date</th><th>Time</th><th>Doctor</th>
+                <th>Patient</th><th>Status</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for appointment in appointments %}
+                <tr>
+                    <td><a href="{{ appointment.get_absolute_url }}">{{ appointment.reference }}</a></td>
+                    <td>{{ appointment.date|date:"D j M Y" }}</td>
+                    <td>{{ appointment.start_time|time:"H:i" }}–{{ appointment.end_time|time:"H:i" }}</td>
+                    <td>Dr. {{ appointment.doctor.user.get_full_name }}</td>
+                    <td>{{ appointment.patient.get_full_name }}</td>
+                    <td>{% include "appointments/_status_badge.html" %}</td>
+                    <td><a href="{{ appointment.get_absolute_url }}">View</a></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="muted">No appointments to show.</p>
+{% endif %}
+{% endblock %}

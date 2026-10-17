@@ -10,4 +10,6 @@ urlpatterns = [
     path("accounts/", include("accounts.urls")),
     # Doctor self-service (availability & leave), namespaced as clinic:*.
     path("clinic/", include("clinic.urls")),
+    # Appointment booking + patient/doctor appointment pages.
+    path("appointments/", include("appointments.urls")),
 ]

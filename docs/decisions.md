@@ -138,6 +138,47 @@ keeping the dependency set minimal and the reviewer setup simple. The UI uses a 
 avatar. Revisit only if the employer requests photos.
 
 
+## ADR-016 — Materialize concrete `AppointmentSlot` rows (Phase 5)
+
+**Context:** Availability is stored as recurring weekly `AvailabilityRule` windows. Booking
+needs a definite, lockable row that can be uniquely claimed and that leave/past filtering has
+already been applied to.
+**Decision:** Generate concrete `AppointmentSlot` rows from active rules via the reusable
+`slot_generation` service and the idempotent `python manage.py generate_slots` command
+(rolling horizon, default 30 days). Slots are never recomputed on the fly at booking time.
+**Consequences:** `SELECT ... FOR UPDATE` has a real row to lock; the
+`UniqueConstraint(doctor, date, start_time)` prevents duplicate materialization; re-running
+the command is safe and preserves `BOOKED` slots; `DoctorLeave` and past intervals are excluded
+at generation. Slots are disposable scheduling artifacts (deleting a doctor cascades), whereas
+appointments are protected history.
+
+## ADR-017 — One active booking per slot via a nullable `OneToOneField` + release-on-cancel
+
+**Context:** The data model proposed a *conditional* unique constraint (unique on `slot` only
+when the appointment is active). Django silently **skips** conditional unique constraints on
+backends without partial-index support — verified for MySQL (`_unique_supported` requires
+`supports_partial_indexes`), so that guarantee would not exist in production.
+**Decision:** Model `Appointment.slot` as a **nullable `OneToOneField`**. Cancelling or
+rescheduling detaches the slot (`slot = NULL`) and returns it to `OPEN`. The plain underlying
+unique index therefore only ever covers the single *active* appointment for a slot.
+**Consequences:** A **hard, portable** database guarantee of at most one active booking per
+slot on MySQL, SQLite, and PostgreSQL — no reliance on unsupported conditional indexes.
+Appointment history is preserved (row + date/time snapshots + cancellation metadata), and the
+released slot can be rebooked. Concurrency is additionally serialized by `select_for_update()`
+on MySQL/InnoDB.
+
+## ADR-018 — Appointment status state machine + 24-hour self-service window
+
+**Context:** Bookings move through several states (request → confirm → check-in → complete,
+plus cancel / no-show). The brief did not fix the confirmation model or a cancellation window.
+**Decision:** Enforce an explicit `ALLOWED_TRANSITIONS` state machine; terminal states
+(`COMPLETED`, `CANCELLED`, `NO_SHOW`) admit no further transitions. Cancellation is always a
+dedicated flow (never a raw status change). Patients may freely cancel/reschedule only up to
+`CANCELLATION_WINDOW = 24h` before the slot; staff may do so at any time until the slot starts.
+**Consequences:** Illegal transitions are rejected server-side with user-facing errors; the
+UI hides actions the user may not take. The 24h window is **provisional** pending employer
+confirmation (open issue Q3) and is defined in one constant to make a later change trivial.
+
 ---
 
 ## Open issues requiring employer confirmation

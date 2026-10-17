@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Book with Dr. {{ doctor.user.get_full_name }} — Care_Clinic{% endblock %}
+
+{% block content %}
+<p class="breadcrumb">
+    <a href="{% url 'doctor_list' %}">Doctors</a> /
+    <a href="{{ doctor.get_absolute_url }}">Dr. {{ doctor.user.get_full_name }}</a> /
+    Book
+</p>
+
+<h1>Book an appointment</h1>
+<p class="lead">Dr. {{ doctor.user.get_full_name }} · {{ doctor.speciality.name }}</p>
+
+{% if dates %}
+    <section>
+        <h2>Choose a date</h2>
+        <ul class="date-nav">
+            {% for d in dates %}
+                <li>
+                    <a class="date-chip {% if d == selected_day %}is-active{% endif %}"
+                       href="?date={{ d|date:'Y-m-d' }}">{{ d|date:"D j M" }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section>
+        <h2>Available slots on {{ selected_day|date:"D j M Y" }}</h2>
+        {% if slots %}
+            <form method="post" class="booking-form">
+                {% csrf_token %}
+                <input type="hidden" name="date" value="{{ selected_day|date:'Y-m-d' }}">
+                {{ form.slot.errors }}
+                <div class="slot-grid">
+                    {% for radio in form.slot %}
+                        <label class="slot-option">{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>
+                    {% endfor %}
+                </div>
+                <p>
+                    {{ form.reason.label_tag }}
+                    {{ form.reason }}
+                    {{ form.reason.errors }}
+                </p>
+                <button type="submit" class="btn btn-primary">Confirm booking</button>
+            </form>
+        {% else %}
+            <p class="muted">No open slots on this date. Please pick another date.</p>
+        {% endif %}
+    </section>
+{% else %}
+    <p class="muted">This doctor has no availability in the next three weeks.</p>
+{% endif %}
+{% endblock %}

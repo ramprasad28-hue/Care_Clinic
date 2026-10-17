@@ -136,6 +136,10 @@ management command or lazily on demand).
 - Check: `start_time < end_time`.
 - Index: `(doctor, date, status)` for the slot-picker query.
 
+> **Implemented (Phase 5, ADR-016):** slots are materialized from active rules by the
+> idempotent `generate_slots` command/service (never lazily on demand); leave and past
+> intervals are excluded at generation time.
+
 ### 3.8 `appointments.Appointment`
 
 | Field | Type | Notes |
@@ -143,7 +147,7 @@ management command or lazily on demand).
 | `reference` | unique, indexed | human-readable booking reference |
 | `patient` | FK → User (role=PATIENT) | `PROTECT` |
 | `doctor` | FK → Doctor | `PROTECT` |
-| `slot` | OneToOne → AppointmentSlot | `PROTECT`; guarantees one appointment per slot |
+| `slot` | OneToOne → AppointmentSlot | `PROTECT`, **nullable**; guarantees one *active* appointment per slot |
 | `date` | date | snapshot for reporting |
 | `start_time`, `end_time` | time | snapshot |
 | `status` | choices | see §4 |
@@ -158,6 +162,12 @@ management command or lazily on demand).
 - Index: `(doctor, date)`, `(patient, date)`, `(status)`.
 - **Conditional unique** `(doctor, date, start_time)` where `status IN
   (REQUESTED, CONFIRMED, CHECKED_IN)` — belt-and-braces double-booking guard.
+
+> **Implemented (Phase 5, ADR-017):** the conditional unique above is **not used** — Django
+> silently skips conditional `UniqueConstraint`s on backends without partial-index support
+> (notably MySQL). Instead `slot` is **nullable** and cancellation/rescheduling detaches it
+> (`slot = NULL`), so the plain unique index on `slot` covers only the active booking. This is
+> a hard, portable guarantee. Status transitions follow the state machine in §4.
 
 ### 3.9 Optional (deferred but planned)
 

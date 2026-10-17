@@ -14,7 +14,7 @@ Each phase lists objective, tasks, deliverables, dependencies, and completion cr
 | 2 | Django foundation | ✅ Complete |
 | 3 | Authentication & RBAC | ✅ Complete |
 | 4 | Doctor & speciality management | ✅ Complete |
-| 5 | Appointment booking | ⬜ |
+| 5 | Appointment booking | ✅ Complete |
 | 6 | Dashboards | ⬜ |
 | 7 | Frontend implementation | ⬜ |
 | 8 | Testing & security hardening | ⬜ |
@@ -90,6 +90,31 @@ constraints; status state machine; booking UI; reference generation; concurrency
 **Deliverables:** Working, safe booking flow.
 **Dependencies:** Phase 4.
 **Completion criteria:** Booking integrity test suite passes, including a concurrency test.
+
+**Status (implemented):**
+- New `appointments` app: `AppointmentSlot` (materialized, `OPEN`/`BOOKED`/`BLOCKED`) and
+  `Appointment` (human-readable `CC-YYYY-000123` reference, date/time snapshots, status).
+  One active booking per slot is enforced by a **nullable `OneToOneField`** + release-on-cancel
+  (portable DB guarantee — ADR-017), since MySQL cannot enforce the conditional unique index
+  proposed in the data model (verified against Django 5.2's `supports_partial_indexes` gate).
+- `slot_generation.py` materializes slots from active `AvailabilityRule` windows, honors the
+  rule/doctor slot length, skips leave and past intervals, and is idempotent (existing `BOOKED`
+  slots are preserved). Exposed via `python manage.py generate_slots` (rolling horizon).
+- `services.py` holds all mutations (`book_slot`, `cancel_appointment`,
+  `reschedule_appointment`, `transition_status`) as `@transaction.atomic` operations using
+  `select_for_update()`; RBAC predicates (`can_book_for`, `can_cancel`, `can_reschedule`,
+  `can_update_status`) are the single source of truth and are re-checked inside the services.
+- Ownership scoping via `Appointment.objects.for_user` (patients self, doctors own schedule,
+  receptionist/admin all) so foreign references yield **404** (IDOR prevention). The actor's
+  role is read from the session, never from submitted ids.
+- Booking/`list`/`detail`/`cancel`/`reschedule` pages (`appointments:*`), status-badge styling,
+  nav link, and a "Book appointment" CTA on doctor detail pages.
+- `sync_roles` extended with appointment permissions; `generate_slots` added.
+- **159 tests pass** under both `manage.py test` and `pytest` (65 appointments tests). The
+  MySQL-only concurrency test (`BookingConcurrencyTests`) is **skipped on SQLite** and is
+  documented in `docs/mysql-validation.md`.
+- **DB note:** migrations/tests ran on the documented **SQLite fallback**; MySQL/InnoDB
+  validation and the row-lock concurrency test remain **blocked** per ADR-003.
 
 ## Phase 6 — Dashboards
 **Objective:** Four role-specific dashboards.

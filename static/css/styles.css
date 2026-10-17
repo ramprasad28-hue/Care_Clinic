@@ -257,3 +257,70 @@ section { margin-bottom: 2rem; }
 .row-actions { display: flex; gap: .75rem; }
 .row-actions a { color: var(--teal); }
 .row-actions a.danger { color: #c53030; }
+
+/* --- Appointments (Phase 5) --- */
+.status-badge {
+    display: inline-block;
+    padding: .18rem .55rem;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    background: #edf2f7;
+    color: var(--navy);
+}
+.status-requested { background: #fef3c7; color: #92400e; }
+.status-confirmed { background: #dbeafe; color: #1e40af; }
+.status-checked_in { background: #e0e7ff; color: #3730a3; }
+.status-completed { background: #d1fae5; color: #065f46; }
+.status-cancelled { background: #fee2e2; color: #991b1b; }
+.status-no_show { background: #f3f4f6; color: #374151; }
+
+.date-nav {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    padding: 0;
+    margin: 0 0 1.5rem;
+}
+.date-chip {
+    display: inline-block;
+    padding: .4rem .7rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--navy);
+    text-decoration: none;
+    font-size: .9rem;
+}
+.date-chip.is-active { background: var(--teal); color: #fff; border-color: var(--teal); }
+
+.slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: .6rem;
+    margin: .5rem 0 1.25rem;
+}
+.slot-option {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .55rem .7rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+}
+.slot-option:has(input:checked) { border-color: var(--teal); box-shadow: 0 0 0 2px rgba(13,115,119,.15); }
+
+.booking-form textarea {
+    width: 100%;
+    padding: .5rem .65rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    font: inherit;
+}
+
+.btn-danger { background: #c53030; color: #fff; }
+.btn-danger:hover { background: #9b2c2c; }

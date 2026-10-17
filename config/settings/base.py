@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     # Local apps
     "accounts.apps.AccountsConfig",
     "clinic.apps.ClinicConfig",
+    "appointments.apps.AppointmentsConfig",
     "website.apps.WebsiteConfig",
 ]
 

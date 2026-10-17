@@ -23,6 +23,12 @@
     <p>{{ doctor.bio }}</p>
 {% endif %}
 
+{% if doctor.is_accepting_appointments %}
+    <p><a class="btn btn-primary" href="{% url 'appointments:book' doctor.slug %}">Book appointment</a></p>
+{% else %}
+    <p class="muted">This doctor is not accepting appointments right now.</p>
+{% endif %}
+
 <h2>Weekly availability</h2>
 {% if doctor.availability_rules.exists %}
     <table class="data-table">
@@ -45,6 +51,4 @@
 {% else %}
     <p class="muted">Availability details are not published yet.</p>
 {% endif %}
-
-<p class="muted">Online booking arrives in a later phase.</p>
 {% endblock %}
