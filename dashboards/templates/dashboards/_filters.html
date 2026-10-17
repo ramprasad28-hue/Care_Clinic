@@ -1,0 +1,8 @@
+{% comment %}Shared search/filter form. Expects filter_form.{% endcomment %}
+<form method="get" class="filter-form">
+    {{ filter_form.as_p }}
+    <p class="filter-actions">
+        <button type="submit" class="btn btn-primary">Apply</button>
+        <a class="btn btn-secondary" href="{{ request.path }}">Reset</a>
+    </p>
+</form>

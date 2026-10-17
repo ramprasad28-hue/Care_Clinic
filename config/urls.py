@@ -12,4 +12,6 @@ urlpatterns = [
     path("clinic/", include("clinic.urls")),
     # Appointment booking + patient/doctor appointment pages.
     path("appointments/", include("appointments.urls")),
+    # Role-based dashboards (landing routes each user to their role's view).
+    path("dashboard/", include("dashboards.urls")),
 ]

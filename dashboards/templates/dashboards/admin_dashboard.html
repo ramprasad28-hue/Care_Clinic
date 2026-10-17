@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Admin dashboard — Care_Clinic{% endblock %}
+
+{% block content %}
+<h1>Administrator dashboard</h1>
+<p class="lead">Clinic-wide statistics and appointment oversight.</p>
+
+<section>
+    <ul class="stat-grid">
+        <li class="stat-card"><span class="stat-value">{{ stats.total }}</span><span class="stat-label">Total appointments</span></li>
+        <li class="stat-card"><span class="stat-value">{{ stats.today }}</span><span class="stat-label">Today</span></li>
+        <li class="stat-card"><span class="stat-value">{{ stats.upcoming }}</span><span class="stat-label">Upcoming</span></li>
+        <li class="stat-card"><span class="stat-value">{{ stats.completed }}</span><span class="stat-label">Completed</span></li>
+        <li class="stat-card"><span class="stat-value">{{ stats.cancelled }}</span><span class="stat-label">Cancelled</span></li>
+        <li class="stat-card"><span class="stat-value">{{ total_patients }}</span><span class="stat-label">Patients</span></li>
+        <li class="stat-card"><span class="stat-value">{{ total_doctors }}</span><span class="stat-label">Doctors</span></li>
+    </ul>
+</section>
+
+<section>
+    <h2>Appointments by status</h2>
+    <ul class="stat-grid">
+        {% for row in status_breakdown %}
+            <li class="stat-card">
+                <span class="stat-value">{{ row.count }}</span>
+                <span class="stat-label">{{ row.label }}</span>
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+
+<section>
+    <h2>Appointments</h2>
+    {% include "dashboards/_filters.html" %}
+    {% include "dashboards/_appointment_table.html" with appointments=appointments show_actions=show_actions %}
+    {% include "dashboards/_pagination.html" %}
+</section>
+{% endblock %}

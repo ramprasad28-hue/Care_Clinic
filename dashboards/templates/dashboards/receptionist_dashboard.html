@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Receptionist dashboard — Care_Clinic{% endblock %}
+
+{% block content %}
+<h1>Receptionist dashboard</h1>
+<p class="lead">Clinic-wide appointments. {{ today_count }} today · {{ upcoming_count }} upcoming.</p>
+
+<p class="filter-bar">
+    <a class="btn btn-primary" href="{% url 'dashboards:receptionist_book' %}">Book for a patient</a>
+    <a class="btn btn-secondary" href="{% url 'doctor_list' %}">Browse doctors</a>
+</p>
+
+{% include "dashboards/_filters.html" %}
+
+{% include "dashboards/_appointment_table.html" with appointments=appointments show_actions=show_actions %}
+
+{% include "dashboards/_pagination.html" %}
+{% endblock %}

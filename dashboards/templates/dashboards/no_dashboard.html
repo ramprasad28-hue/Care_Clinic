@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}No dashboard — Care_Clinic{% endblock %}
+
+{% block content %}
+<h1>No dashboard available</h1>
+<p class="muted">
+    Your account does not have a dashboard role assigned. Please contact a clinic
+    administrator if you believe this is a mistake.
+</p>
+<p><a class="btn btn-secondary" href="{% url 'home' %}">Return home</a></p>
+{% endblock %}

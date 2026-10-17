@@ -3,13 +3,13 @@
 Recruitment task for **Anmaya Health Technologies Private Limited**:
 a clinic web application with **appointment booking** and **Role-Based Access Control (RBAC)**.
 
-> **Current status: Phase 5 — Appointment Booking (complete).**
+> **Current status: Phase 6 — Role-Based Dashboards (complete).**
 > Builds on the Django project, custom email-based user model, authentication (login /
 > logout / password reset), patient-only registration, role groups, RBAC primitives, the
-> clinic catalog (`clinic`), and the public site (`website`). Phase 5 adds the `appointments`
-> app: race-safe slot generation and booking, cancellation and rescheduling, a status state
-> machine, and patient/doctor appointment pages — with **159 passing tests** (one MySQL-only
-> concurrency test skipped on SQLite). Dashboards arrive in a later phase.
+> clinic catalog (`clinic`), the public site (`website`), and the race-safe booking flow
+> (`appointments`). Phase 6 adds the `dashboards` app: a role-routed landing page and
+> Patient / Doctor / Receptionist / Admin dashboards with shared search, filtering and
+> pagination — **205 passing tests** (one MySQL-only concurrency test skipped on SQLite).
 
 ## Purpose
 
@@ -42,7 +42,7 @@ No React, Next.js, or microservices — a straightforward, server-rendered Djang
 | Virtual environment | `C:\venvs\anmaya-clinic` (deliberately **outside** OneDrive) |
 | Git repository root | This folder (dedicated repository, branch `main`) |
 
-## Project structure (through Phase 5)
+## Project structure (through Phase 6)
 
 ```
 config/
@@ -62,6 +62,11 @@ appointments/ models.py (AppointmentSlot, Appointment) · slot_generation.py · 
              templates/appointments/  appointment_list · appointment_detail
                                       appointment_book · appointment_cancel
                                       appointment_reschedule
+dashboards/  selectors.py · forms.py · views.py · urls.py · tests.py  (no models/migrations)
+             templates/dashboards/  patient_dashboard · doctor_dashboard
+                                    receptionist_dashboard · receptionist_book
+                                    admin_dashboard · no_dashboard
+                                    _appointment_table · _filters · _pagination
 website/     views.py · urls.py · apps.py · tests.py
              templates/website/  speciality_list · speciality_detail
                                  doctor_list · doctor_detail
@@ -227,7 +232,37 @@ flow through transactional services:
   slot is released and history is kept. Patients may self-cancel/reschedule up to **24 h**
   before the slot (staff, until it starts) — provisional (ADR-018).
 
-### 10. Run tests
+### 10. Dashboards (Phase 6)
+
+The `dashboards` app adds a role-routed landing page and four dashboards. It has **no
+models and no migrations** — it composes existing data and delegates all state changes to
+`appointments.services` (ADR-019).
+
+| Route | Access | Purpose |
+|---|---|---|
+| `/dashboard/` | any authenticated user | Route to the dashboard for the user's role |
+| `/dashboard/patient/` | Patient | Own upcoming + past appointments |
+| `/dashboard/doctor/` | Doctor | Own schedule: today / upcoming / past + status actions |
+| `/dashboard/receptionist/` | Receptionist | Clinic-wide, filterable list + link to book |
+| `/dashboard/receptionist/book/` | Receptionist | Book a slot on behalf of a patient |
+| `/dashboard/admin/` | Admin | Aggregated statistics + filterable list |
+| `/dashboard/appointments/<reference>/status/` | Doctor/Receptionist/Admin | Apply a permitted status transition (**POST** only) |
+
+- **Routing & safety:** `/dashboard/` reads the role from the **session user** (never the
+  request body) and redirects; anonymous users go to login, and an unrecognised role renders
+  a safe "no dashboard" page. Every dashboard is gated by `RoleRequiredMixin`.
+- **Ownership first:** list views call `Appointment.objects.for_user` *before* applying
+  filters, and the doctor dashboard is scoped to the caller's own `Doctor` profile — a
+  foreign reference returns **404** (IDOR prevention).
+- **Search/filter/pagination:** optional `scope` (`upcoming`/`today`/`past`/`all`), `date`,
+  `status`, `doctor`, `patient` and `reference` filters; malformed values degrade to "no
+  filter" instead of erroring, and invalid page numbers fall back safely
+  (`Paginator.get_page`). Filters are preserved across pagination links.
+- **Status actions** are shown only when `services.can_update_status` allows them and always
+  route through `services.transition_status`; book-on-behalf validates the submitted
+  patient/doctor through `ModelChoiceField`s before calling `services.book_slot`.
+
+### 11. Run tests
 
 ```powershell
 python manage.py test              # Django test runner
@@ -237,7 +272,7 @@ pytest                             # pytest-django (config in pytest.ini)
 The MySQL-only concurrency test is skipped on SQLite; see
 [`docs/mysql-validation.md`](docs/mysql-validation.md) for the exact MySQL/InnoDB procedure.
 
-### 11. Start the development server
+### 12. Start the development server
 
 ```powershell
 python manage.py runserver
@@ -251,15 +286,16 @@ python manage.py runserver
 | [`docs/requirements.md`](docs/requirements.md) | Confirmed/proposed features, out-of-scope, open employer questions |
 | [`docs/architecture.md`](docs/architecture.md) | App structure, booking workflow, RBAC matrix, security, frontend direction |
 | [`docs/data-model.md`](docs/data-model.md) | Entities, ERD (Mermaid), constraints, status state machine |
-| [`docs/decisions.md`](docs/decisions.md) | Architecture Decision Records (ADR-001…018) |
+| [`docs/decisions.md`](docs/decisions.md) | Architecture Decision Records (ADR-001…019) |
 | [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) | Phases, testing strategy, security checklist |
 | [`docs/mysql-validation.md`](docs/mysql-validation.md) | Exact MySQL/InnoDB validation + concurrency procedure |
 
 ## Planned Django apps
 
 `accounts` (auth/roles) · `clinic` (doctors/specialities/availability) ·
-`website` (public pages) · `appointments` (slots/bookings/services) — **all implemented** —
-then `dashboards` · `notifications` (optional, deferred) — plus the `config` package.
+`website` (public pages) · `appointments` (slots/bookings/services) ·
+`dashboards` (role dashboards) — **all implemented** — plus the `config` package and
+`notifications` (optional, deferred).
 
 ## Safety notices
 
@@ -276,7 +312,7 @@ then `dashboards` · `notifications` (optional, deferred) — plus the `config` 
 3. Authentication & RBAC — **done**
 4. Doctor & speciality management — **done**
 5. Appointment booking — **done**
-6. Dashboards
+6. Dashboards — **done**
 7. Frontend implementation
 8. Testing & security
 9. Submission preparation

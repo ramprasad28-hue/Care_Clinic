@@ -15,7 +15,7 @@ Each phase lists objective, tasks, deliverables, dependencies, and completion cr
 | 3 | Authentication & RBAC | ✅ Complete |
 | 4 | Doctor & speciality management | ✅ Complete |
 | 5 | Appointment booking | ✅ Complete |
-| 6 | Dashboards | ⬜ |
+| 6 | Dashboards | ✅ Complete |
 | 7 | Frontend implementation | ⬜ |
 | 8 | Testing & security hardening | ⬜ |
 | 9 | Submission preparation | ⬜ |
@@ -123,6 +123,35 @@ status actions; availability/leave management.
 **Deliverables:** All four dashboards functional.
 **Dependencies:** Phase 5.
 **Completion criteria:** Role flows verified by tests and manual checks.
+
+**Status (implemented):**
+- New `dashboards` app (no models — **no migrations**; ADR-019). A single landing
+  route (`/dashboard/`) maps an authenticated user to their role's dashboard and
+  redirects; anonymous users go to login and an unrecognised role renders a safe
+  "no dashboard" page. The role is always read from the session user.
+- **Patient** (`/dashboard/patient/`): own upcoming + past appointments (scoped via
+  `Appointment.objects.for_user`), status badges, and a link to book.
+- **Doctor** (`/dashboard/doctor/`): own schedule split into today / upcoming / past,
+  with permitted status actions (`Confirm`, `Check in`, `Complete`, `No show`) applied
+  through `services.transition_status`; a doctor without a profile renders safely.
+- **Receptionist** (`/dashboard/receptionist/`): clinic-wide, filterable appointment
+  list plus **book-on-behalf** (`/dashboard/receptionist/book/`) that reuses
+  `services.book_slot` with validated `ModelChoiceField`s for patient and doctor.
+- **Admin** (`/dashboard/admin/`): aggregated statistics (total/today/upcoming/
+  completed/cancelled appointments, patients, doctors) and a per-status breakdown,
+  derived with `aggregate()`/`values().annotate()` (no N+1).
+- **Shared search/filter/pagination** (`dashboards/selectors.py`): optional scope
+  (upcoming/today/past/all), date, status, doctor, patient and reference filters are
+  applied to an *already ownership-scoped* queryset; malformed input degrades to "no
+  filter" instead of erroring, and `Paginator.get_page` makes invalid page numbers
+  safe. Filters are preserved in pagination links.
+- **Security:** every route is `RoleRequiredMixin`-gated; records resolve through the
+  scoped querysets so foreign references return **404** (IDOR prevention); status
+  changes are POST-only with CSRF and delegate to `appointments.services`.
+- **205 tests pass** under both `manage.py test` and `pytest` (46 new dashboard tests;
+  the MySQL-only concurrency test is still skipped on SQLite).
+- **DB note:** migrations/tests ran on the documented **SQLite fallback**; MySQL/InnoDB
+  validation remains **blocked** per ADR-003.
 
 ## Phase 7 — Frontend implementation
 **Objective:** Original, accessible UI (design direction in `architecture.md` §8).

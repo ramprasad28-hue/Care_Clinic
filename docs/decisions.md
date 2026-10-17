@@ -179,6 +179,25 @@ dedicated flow (never a raw status change). Patients may freely cancel/reschedul
 UI hides actions the user may not take. The 24h window is **provisional** pending employer
 confirmation (open issue Q3) and is defined in one constant to make a later change trivial.
 
+## ADR-019 — Dashboards are thin, read-mostly views over existing services (Phase 6)
+
+**Context:** Phase 6 needs four role-specific dashboards (Patient, Doctor, Receptionist,
+Admin) with search/filtering and a few new actions (status changes, book-on-behalf). The
+existing `appointments` app already owns all booking state and its transactional services and
+scoped querysets.
+**Decision:** Add a new `dashboards` app that contains **no models and no migrations**. Its
+views compose existing data: reads go through `Appointment.objects.for_user` (ownership first,
+then optional filtering/pagination in `dashboards/selectors.py`); writes delegate to
+`appointments.services` (`book_slot`, `transition_status`). A single landing route
+(`/dashboard/`) redirects each authenticated user to their role's dashboard by reading the
+role from the session — never from the request body — and renders a safe page for an
+unrecognised role.
+**Consequences:** No schema churn and a single source of truth for booking rules and IDOR
+scoping; dashboards stay presentational and cheap to test. `LOGIN_REDIRECT_URL` is left as
+`/` so the existing login-redirect test is preserved; users reach `/dashboard/` via the nav
+link. Book-on-behalf validates the submitted patient/doctor id through `ModelChoiceField`s
+before calling the service, so a forged id cannot be used.
+
 ---
 
 ## Open issues requiring employer confirmation

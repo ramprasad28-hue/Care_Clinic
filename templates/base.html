@@ -15,6 +15,7 @@
                 <a href="{% url 'speciality_list' %}">Specialities</a>
                 <a href="{% url 'doctor_list' %}">Doctors</a>
                 {% if user.is_authenticated %}
+                    <a href="{% url 'dashboards:landing' %}">Dashboard</a>
                     <a href="{% url 'appointments:list' %}">My appointments</a>
                     {% if user.is_doctor %}
                         <a href="{% url 'clinic:availability_list' %}">My availability</a>

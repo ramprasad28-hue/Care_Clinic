@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Doctor dashboard — Care_Clinic{% endblock %}
+
+{% block content %}
+<h1>Doctor dashboard</h1>
+
+{% if doctor %}
+    <p class="lead">
+        Dr. {{ user.get_full_name }} — {{ doctor.speciality.name }}
+        {% if not doctor.is_accepting_appointments %}<em>(not accepting appointments)</em>{% endif %}
+    </p>
+
+    <p class="filter-bar">
+        <a class="btn btn-secondary" href="{% url 'clinic:availability_list' %}">My availability</a>
+        <a class="btn btn-secondary" href="{% url 'clinic:leave_list' %}">My leave</a>
+        <a class="btn btn-secondary" href="{% url 'appointments:list' %}?scope=upcoming">All my appointments</a>
+    </p>
+
+    <section>
+        <h2>Today ({% now "D j M Y" %})</h2>
+        {% include "dashboards/_appointment_table.html" with appointments=today show_actions=True %}
+    </section>
+
+    <section>
+        <h2>Upcoming</h2>
+        {% include "dashboards/_appointment_table.html" with appointments=upcoming show_actions=True %}
+    </section>
+
+    <section>
+        <h2>Past</h2>
+        {% include "dashboards/_appointment_table.html" with appointments=past show_actions=True %}
+    </section>
+{% else %}
+    <p class="muted">
+        Your account has the Doctor role but no doctor profile is linked yet.
+        Please contact a clinic administrator.
+    </p>
+{% endif %}
+{% endblock %}

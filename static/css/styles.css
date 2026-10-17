@@ -324,3 +324,53 @@ section { margin-bottom: 2rem; }
 
 .btn-danger { background: #c53030; color: #fff; }
 .btn-danger:hover { background: #9b2c2c; }
+
+/* --- Dashboards (Phase 6) --- */
+.stat-grid {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: .75rem;
+}
+.stat-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: .9rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+.stat-value { font-size: 1.6rem; font-weight: 700; color: var(--navy); }
+.stat-label { font-size: .82rem; color: #718096; text-transform: uppercase; letter-spacing: .03em; }
+
+.filter-form {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    margin: 1rem 0 1.5rem;
+}
+.filter-form p { margin: 0 0 .75rem; }
+.filter-form label { display: block; font-weight: 600; margin-bottom: .2rem; }
+.filter-form input[type="text"],
+.filter-form input[type="date"],
+.filter-form select {
+    width: 100%;
+    padding: .5rem .6rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    font: inherit;
+    background: #fff;
+}
+.filter-actions { display: flex; gap: .75rem; align-items: center; }
+
+.pagination { display: flex; align-items: center; gap: 1rem; margin: 1.25rem 0; }
+.pagination-status { color: #718096; font-size: .9rem; }
+
+.action-link { color: var(--teal); }
+
+section > h2 { color: var(--navy); }
+

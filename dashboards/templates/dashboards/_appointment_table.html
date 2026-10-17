@@ -1,0 +1,46 @@
+{% comment %}
+Shared appointment table. Expects:
+  appointments  — iterable of Appointment (each may carry .can_manage/.allowed_actions)
+  show_actions  — optional flag to render the status-action controls
+{% endcomment %}
+{% if appointments %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Reference</th><th>Date</th><th>Time</th>
+                <th>Doctor</th><th>Patient</th><th>Status</th>
+                {% if show_actions %}<th>Actions</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for appointment in appointments %}
+                <tr>
+                    <td><a href="{{ appointment.get_absolute_url }}">{{ appointment.reference }}</a></td>
+                    <td>{{ appointment.date|date:"D j M Y" }}</td>
+                    <td>{{ appointment.start_time|time:"H:i" }}–{{ appointment.end_time|time:"H:i" }}</td>
+                    <td>Dr. {{ appointment.doctor.user.get_full_name }}</td>
+                    <td>{{ appointment.patient.get_full_name }}</td>
+                    <td>{% include "appointments/_status_badge.html" with appointment=appointment %}</td>
+                    {% if show_actions %}
+                        <td class="row-actions">
+                            {% if appointment.can_manage %}
+                                {% for value, label in appointment.allowed_actions %}
+                                    <form method="post"
+                                          action="{% url 'dashboards:appointment_status' appointment.reference %}"
+                                          class="inline-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="new_status" value="{{ value }}">
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="link-button action-link">{{ label }}</button>
+                                    </form>
+                                {% endfor %}
+                            {% endif %}
+                        </td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="muted">No appointments to show.</p>
+{% endif %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Patient dashboard — Care_Clinic{% endblock %}
+
+{% block content %}
+<h1>Patient dashboard</h1>
+<p class="lead">Welcome, {{ user.get_full_name }}.</p>
+
+<p class="filter-bar">
+    <a class="btn btn-primary" href="{% url 'doctor_list' %}">Book an appointment</a>
+    <a class="btn btn-secondary" href="{% url 'appointments:list' %}">All my appointments</a>
+</p>
+
+<section>
+    <h2>Upcoming appointments</h2>
+    {% include "dashboards/_appointment_table.html" with appointments=upcoming show_actions=False %}
+</section>
+
+<section>
+    <h2>Past appointments</h2>
+    {% include "dashboards/_appointment_table.html" with appointments=history show_actions=False %}
+</section>
+{% endblock %}

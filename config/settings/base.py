@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "accounts.apps.AccountsConfig",
     "clinic.apps.ClinicConfig",
     "appointments.apps.AppointmentsConfig",
+    "dashboards.apps.DashboardsConfig",
     "website.apps.WebsiteConfig",
 ]
 
