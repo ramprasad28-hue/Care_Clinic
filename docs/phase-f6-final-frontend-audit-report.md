@@ -139,4 +139,11 @@ F6 cleanup (transactional, verified) removed ALL QA6 probe data:
 | 4 | 26 screenshots reviewed at both widths during the audit; **+3 correction screenshots inspected** (`f6c_patient_dash_1440/390`, `f6c_appt_list_1440`) | ✅ |
 | 5 | Data cleaned to the documented baseline (0 qa6-/f6c-, preserves user-created data) | ✅ |
 | 6 | Sign-off correction (Upcoming excludes cancelled; regression tests + gates) delivered | ✅ |
-| 7 | **Awaiting user review of this report** before F6 is closed and C1 begins | ⬜ |
+| 7 | **User review of this report: signed off (2026-10-20)** — F6 closed on approval; C1 followed and was also approved; both recorded in `docs/implementation-roadmap.md` | ✅ |
+
+> **Final sign-off:** the user approved F6 (including the section-1b
+> sign-off correction) and the whole F1–F6 frontend programme on 2026-10-20.
+> The approved work was committed to `origin/main` as `4e0754f`
+> ("feat: complete clinic frontend and admin-managed imagery").
+> No technical findings or test results in this report were altered by
+> sign-off.

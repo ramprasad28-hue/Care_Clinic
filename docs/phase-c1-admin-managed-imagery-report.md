@@ -1,6 +1,8 @@
 # Phase C1 — Admin-Managed Website Imagery: Delivery Report
 
-**Status:** Implementation complete — all gates green — staining for human review.
+**Status:** Implementation complete — all gates green — **user reviewed and
+signed off (2026-10-20)**; committed to `origin/main` as `4e0754f`
+("feat: complete clinic frontend and admin-managed imagery").
 **Date:** 2026-10-20 · **Plan:** `docs/phase-c1-admin-managed-imagery-plan.md` ·
 **Decision:** ADR-022 (`docs/decisions.md`) — supersedes ADR-015 (per user
 approval of that decision when C1 was scheduled).
@@ -217,5 +219,7 @@ admin UI's "Currently/Clear/Current image" behaviour renders as expected;
 
 Per the standing directive: C1 implementation, tests, gates and visual
 verification are complete; docs (ADR-022, data-model, imagery licensing
-duties, roadmap) are updated. **No B0+ work started, nothing committed.**
-This report is ready for human review before the video phase or B0+ begins.
+duties, roadmap) are updated. **No B0+ work started.**
+The user reviewed this report and approved the implementation (2026-10-20);
+the approved work is committed to `origin/main` as `4e0754f`. All technical
+findings and deployment limitations in this report remain unchanged.

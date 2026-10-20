@@ -34,8 +34,13 @@ Each phase lists objective, tasks, deliverables, dependencies, and completion cr
 |---|---|---|---|
 | F5 | Dashboards | ✅ | Visual redesign of the four role dashboards (report: `phase-f5-dashboards-frontend-report.md`) |
 | F6 | Full frontend QA & approval | ✅ | Whole-app frontend regression, a11y/UX audit, user sign-off (report: `phase-f6-final-frontend-audit-report.md`) |
-| C1 | Admin-managed website imagery | 🔄 | Upload/replace/preview/manage all website imagery via Django Admin (implementation complete + all gates green; report for review: `phase-c1-admin-managed-imagery-report.md`) |
+| C1 | Admin-managed website imagery | ✅ | Upload/replace/preview/manage all website imagery via Django Admin (implementation + user review complete; report: `phase-c1-admin-managed-imagery-report.md`) |
 | B0+ | Backend audit & polishing | ⬜ | Backend improvements, incl. findings carried from earlier phases |
+
+> **Frontend programme F1–F6: complete (2026-10-20) — all phases signed off and
+> recorded** alongside C1; the frontend work and C1 are committed to
+> `origin/main` as `4e0754f` ("feat: complete clinic frontend and
+> admin-managed imagery"). B0+ remains pending.
 
 > **C1 plan:** `docs/phase-c1-admin-managed-imagery-plan.md`, implementation report:
 > `docs/phase-c1-admin-managed-imagery-report.md`. It reverses ADR-015, adds
