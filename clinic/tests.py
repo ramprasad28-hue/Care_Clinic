@@ -460,3 +460,50 @@ class SeedClinicCommandTests(TestCase):
         self.assertEqual(Speciality.objects.count(), 5)
         self.assertEqual(Doctor.objects.count(), 3)
         self.assertEqual(User.objects.filter(role=User.Role.DOCTOR).count(), 3)
+
+
+# --------------------------------------------------------------------------
+# Presentation contracts (Phase 7.5 / Phase 9)
+# --------------------------------------------------------------------------
+class ClinicTemplatePresentationTests(TestCase):
+    """Guards the editorial presentation contracts of the self-service pages.
+
+    These are presentation-only: they protect the accessible table headers, the
+    editorial page-head rule, and the confirm-panel accessible name without
+    asserting any new behaviour.
+    """
+
+    def setUp(self):
+        spec = make_speciality("Cardiology")
+        self.doctor = make_doctor(spec, email="owner@example.com")
+        self.rule = AvailabilityRule.objects.create(
+            doctor=self.doctor, weekday=Weekday.MONDAY,
+            start_time=time(9, 0), end_time=time(13, 0),
+        )
+        self.leave = DoctorLeave.objects.create(
+            doctor=self.doctor, start_date=date(2026, 2, 1), end_date=date(2026, 2, 2),
+        )
+        self.client.force_login(self.doctor.user)
+
+    def test_tables_keep_scoped_headers(self):
+        self.assertContains(self.client.get(reverse("clinic:availability_list")), 'scope="col"')
+        self.assertContains(self.client.get(reverse("clinic:leave_list")), 'scope="col"')
+
+    def test_list_and_form_pages_use_editorial_rule(self):
+        for name in (
+            "clinic:availability_list",
+            "clinic:leave_list",
+            "clinic:availability_add",
+            "clinic:leave_add",
+        ):
+            self.assertContains(self.client.get(reverse(name)), "section-rule", msg_prefix=name)
+
+    def test_confirmation_panels_have_accessible_name(self):
+        rule_page = self.client.get(
+            reverse("clinic:availability_delete", kwargs={"pk": self.rule.pk})
+        )
+        self.assertContains(rule_page, 'aria-labelledby="delete-availability-heading"')
+        leave_page = self.client.get(
+            reverse("clinic:leave_delete", kwargs={"pk": self.leave.pk})
+        )
+        self.assertContains(leave_page, 'aria-labelledby="delete-leave-heading"')

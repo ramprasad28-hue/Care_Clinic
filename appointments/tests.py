@@ -626,6 +626,16 @@ class BookingViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.doctor.user.get_full_name())
 
+    def test_booking_form_preserves_slot_value_and_guards(self):
+        # Presentation contract: slot radios keep one option per slot keyed by
+        # the slot PK, and the form keeps its no-JS-friendly guard attributes.
+        self.client.force_login(self.patient)
+        response = self.client.get(reverse("appointments:book", args=[self.doctor.slug]))
+        self.assertContains(response, 'name="slot"')
+        self.assertContains(response, f'value="{self.slot.pk}"')
+        self.assertContains(response, "novalidate")
+        self.assertContains(response, "data-guard")
+
     def test_patient_can_book_via_post(self):
         self.client.force_login(self.patient)
         response = self.client.post(
@@ -679,6 +689,8 @@ class AppointmentListDetailViewTests(TestCase):
             reverse("appointments:detail", args=[self.appointment.reference])
         )
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.appointment.reference)
+        self.assertContains(response, self.appointment.doctor.user.get_full_name())
 
 
 class CancelRescheduleViewTests(TestCase):
@@ -703,6 +715,25 @@ class CancelRescheduleViewTests(TestCase):
         self.assertEqual(post_resp.status_code, 302)
         self.appointment.refresh_from_db()
         self.assertEqual(self.appointment.status, AppointmentStatus.CANCELLED)
+
+    def test_cancel_page_keeps_reference_and_guards(self):
+        self.client.force_login(self.patient)
+        response = self.client.get(
+            reverse("appointments:cancel", args=[self.appointment.reference])
+        )
+        self.assertContains(response, self.appointment.reference)
+        self.assertContains(response, "novalidate")
+        self.assertContains(response, "data-guard")
+
+    def test_reschedule_form_preserves_slot_value_and_guards(self):
+        self.client.force_login(self.patient)
+        response = self.client.get(
+            reverse("appointments:reschedule", args=[self.appointment.reference])
+        )
+        self.assertContains(response, 'name="slot"')
+        self.assertContains(response, f'value="{self.slot_b.pk}"')
+        self.assertContains(response, "novalidate")
+        self.assertContains(response, "data-guard")
 
     def test_reschedule_get_and_post(self):
         self.client.force_login(self.patient)

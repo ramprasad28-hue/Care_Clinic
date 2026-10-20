@@ -3,13 +3,15 @@
 Recruitment task for **Anmaya Health Technologies Private Limited**:
 a clinic web application with **appointment booking** and **Role-Based Access Control (RBAC)**.
 
-> **Current status: Phase 6 — Role-Based Dashboards (complete).**
+> **Current status: Phase 7 — Frontend implementation (complete).**
 > Builds on the Django project, custom email-based user model, authentication (login /
 > logout / password reset), patient-only registration, role groups, RBAC primitives, the
-> clinic catalog (`clinic`), the public site (`website`), and the race-safe booking flow
-> (`appointments`). Phase 6 adds the `dashboards` app: a role-routed landing page and
-> Patient / Doctor / Receptionist / Admin dashboards with shared search, filtering and
-> pagination — **205 passing tests** (one MySQL-only concurrency test skipped on SQLite).
+> clinic catalog (`clinic`), the public site (`website`), the race-safe booking flow
+> (`appointments`), and the Phase 6 dashboards. Phase 7 adds an original, responsive,
+> accessible UI: a hand-built CSS design system (no framework, no build step), a shared
+> app shell, reusable form/table/status components, and redesigned public, auth, booking
+> and dashboard pages — **205 passing tests** (one MySQL-only concurrency test skipped on
+> SQLite). No backend behaviour, routes, form fields or migrations changed.
 
 ## Purpose
 
@@ -25,8 +27,8 @@ dashboard with permissions enforced on the backend.
 | Framework | **Django 5.2 LTS** | **5.2.18** |
 | Database | **MySQL (InnoDB)** | driver `mysqlclient 2.3.0` installed — *see Database note* |
 | Templating | Django templates + HTML + CSS | — |
-| UI | Bootstrap 5 (full design in Phase 7) | — |
-| Interactivity | Vanilla JavaScript (no SPA framework) | — |
+| UI | Hand-built CSS design system (no framework, no build step) | — |
+| Interactivity | Vanilla JavaScript, progressive enhancement only | — |
 | ORM | Django ORM | — |
 | Config/secrets | `python-dotenv` + `.env` (never committed) | python-dotenv 1.2.4 |
 | Version control | Git / GitHub | — |
@@ -42,7 +44,7 @@ No React, Next.js, or microservices — a straightforward, server-rendered Djang
 | Virtual environment | `C:\venvs\anmaya-clinic` (deliberately **outside** OneDrive) |
 | Git repository root | This folder (dedicated repository, branch `main`) |
 
-## Project structure (through Phase 6)
+## Project structure (through Phase 7)
 
 ```
 config/
@@ -71,7 +73,9 @@ website/     views.py · urls.py · apps.py · tests.py
              templates/website/  speciality_list · speciality_detail
                                  doctor_list · doctor_detail
 templates/   base.html · home.html
-static/      css/styles.css
+             partials/  _field · _form_errors
+static/      css/styles.css        (design system: tokens + components)
+             js/app.js             (progressive enhancement only)
 manage.py · pytest.ini · requirements.txt · .env.example · docs/
 ```
 
@@ -262,7 +266,30 @@ models and no migrations** — it composes existing data and delegates all state
   route through `services.transition_status`; book-on-behalf validates the submitted
   patient/doctor through `ModelChoiceField`s before calling `services.book_slot`.
 
-### 11. Run tests
+### 11. Interface & design system (Phase 7)
+
+Phase 7 replaced the placeholder styling with an original, dependency-free UI ("calm clinical
+clarity" — ADR-020). A single stylesheet (`static/css/styles.css`) is driven by design tokens
+(colour, typography, spacing, radii, shadows, focus, breakpoints); `templates/base.html` is the
+shared shell (skip link, sticky header, role-aware nav, accessible flash messages, footer).
+
+- **No framework, no build step, no CDN/external assets.** Layout uses CSS grid/flexbox;
+  responsiveness and the mobile nav are CSS-first.
+- **Progressive enhancement only:** `static/js/app.js` adds a mobile-menu toggle, filter
+  auto-submit, confirm dialogs, a double-submit guard and focus-first-error. The site remains
+  fully usable with JavaScript disabled.
+- **Reusable components:** `templates/partials/_field.html` (label + required marker + widget
+  + help + inline errors), `_form_errors.html`, status badges (text + shape, never colour
+  alone), responsive appointment tables (stacked rows on small screens, no JS), filters and
+  pagination.
+- **Accessibility:** semantic landmarks, heading hierarchy, visible `:focus-visible` rings,
+  `prefers-reduced-motion` support, labelled/typed inputs, and horizontal-overflow-free layouts
+  from 360 px to 1440 px.
+- **Unchanged backend:** Phase 7 adds **no models or migrations**, and no route names, URL
+  patterns, form field names, POST/redirect behaviour, template context contracts, RBAC rules
+  or booking logic were altered.
+
+### 12. Run tests
 
 ```powershell
 python manage.py test              # Django test runner
@@ -272,7 +299,7 @@ pytest                             # pytest-django (config in pytest.ini)
 The MySQL-only concurrency test is skipped on SQLite; see
 [`docs/mysql-validation.md`](docs/mysql-validation.md) for the exact MySQL/InnoDB procedure.
 
-### 12. Start the development server
+### 13. Start the development server
 
 ```powershell
 python manage.py runserver
@@ -286,7 +313,7 @@ python manage.py runserver
 | [`docs/requirements.md`](docs/requirements.md) | Confirmed/proposed features, out-of-scope, open employer questions |
 | [`docs/architecture.md`](docs/architecture.md) | App structure, booking workflow, RBAC matrix, security, frontend direction |
 | [`docs/data-model.md`](docs/data-model.md) | Entities, ERD (Mermaid), constraints, status state machine |
-| [`docs/decisions.md`](docs/decisions.md) | Architecture Decision Records (ADR-001…019) |
+| [`docs/decisions.md`](docs/decisions.md) | Architecture Decision Records (ADR-001…020) |
 | [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) | Phases, testing strategy, security checklist |
 | [`docs/mysql-validation.md`](docs/mysql-validation.md) | Exact MySQL/InnoDB validation + concurrency procedure |
 
@@ -313,7 +340,7 @@ python manage.py runserver
 4. Doctor & speciality management — **done**
 5. Appointment booking — **done**
 6. Dashboards — **done**
-7. Frontend implementation
+7. Frontend implementation — **done**
 8. Testing & security
 9. Submission preparation
 

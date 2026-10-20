@@ -3,12 +3,17 @@
 {% block title %}Delete availability rule — Care_Clinic{% endblock %}
 
 {% block content %}
-<h1>Delete availability rule</h1>
-<p>Delete the {{ object.get_weekday_display }} {{ object.start_time|time:"H:i" }}–{{ object.end_time|time:"H:i" }} rule?</p>
-
-<form method="post">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-primary">Delete</button>
-    <a class="btn btn-secondary" href="{% url 'clinic:availability_list' %}">Cancel</a>
-</form>
+<div class="container container--form">
+    <section class="confirm" aria-labelledby="delete-availability-heading">
+        <h1 id="delete-availability-heading">Delete availability rule</h1>
+        <p>Delete the {{ object.get_weekday_display }} {{ object.start_time|time:"H:i" }}–{{ object.end_time|time:"H:i" }} rule?</p>
+        <form method="post" class="form">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn--danger">Delete</button>
+                <a class="btn btn--secondary" href="{% url 'clinic:availability_list' %}">Cancel</a>
+            </div>
+        </form>
+    </section>
+</div>
 {% endblock %}

@@ -1,0 +1,30 @@
+{% load static %}{% load clinic_images %}
+{% comment %}
+Public speciality card. Expects `speciality`. Renders an <li> for `.service-grid`.
+Shared by the homepage and the speciality listing.
+Editorial index entry: hairline rule, title, concise description, understated text CTA.
+Optional photograph per speciality: the administrator upload (ADR-022) or the
+static placeholder `static/img/specialities/<slug>-card.jpg` (rendered only when
+a file/upload exists — graceful text-only fallback otherwise).
+All card tiles are licensed atmosphere imagery: they are NOT presented as the
+clinic's own premises, staff, or doctors (plan §6B.1); the image is decorative
+(`alt=""`) because the card title carries the meaning.
+{% endcomment %}
+<li class="service-card">
+    {% speciality_tile_image speciality as card_image_url %}
+    {% if card_image_url %}
+        <div class="service-card__media" aria-hidden="true">
+            <img src="{{ card_image_url }}" alt="" width="900" height="600" loading="lazy" decoding="async">
+        </div>
+    {% endif %}
+    <h3 class="service-card__title">
+        <a href="{{ speciality.get_absolute_url }}">{{ speciality.name }}</a>
+    </h3>
+    {% if speciality.description %}
+        <p class="service-card__text">{{ speciality.description|truncatewords:18 }}</p>
+    {% endif %}
+    <a class="service-card__link" href="{{ speciality.get_absolute_url }}">
+        View doctors
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+</li>

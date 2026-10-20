@@ -1,36 +1,77 @@
 {% extends "base.html" %}
+{% load static %}
+{% load clinic_images %}
 
 {% block title %}Appointment {{ appointment.reference }} — Care_Clinic{% endblock %}
 
 {% block content %}
-<p class="breadcrumb"><a href="{% url 'appointments:list' %}">Appointments</a> / {{ appointment.reference }}</p>
+<div class="container">
+    <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb">
+            <li><a href="{% url 'appointments:list' %}">Appointments</a></li>
+            <li aria-current="page">{{ appointment.reference }}</li>
+        </ol>
+    </nav>
 
-<h1>Appointment {{ appointment.reference }}</h1>
-<p class="lead">{% include "appointments/_status_badge.html" with appointment=appointment %}</p>
-
-<dl class="detail-list">
-    <dt>Doctor</dt><dd>Dr. {{ appointment.doctor.user.get_full_name }} ({{ appointment.doctor.speciality.name }})</dd>
-    <dt>Patient</dt><dd>{{ appointment.patient.get_full_name }}</dd>
-    <dt>Date</dt><dd>{{ appointment.date|date:"D j M Y" }}</dd>
-    <dt>Time</dt><dd>{{ appointment.start_time|time:"H:i" }}–{{ appointment.end_time|time:"H:i" }}</dd>
-    {% if appointment.reason %}<dt>Reason</dt><dd>{{ appointment.reason }}</dd>{% endif %}
-    <dt>Booked</dt><dd>{{ appointment.created_at|date:"j M Y, H:i" }}</dd>
-    {% if appointment.cancelled_by %}
-        <dt>Cancelled by</dt><dd>{{ appointment.cancelled_by.get_full_name }}</dd>
-    {% endif %}
-    {% if appointment.cancellation_reason %}
-        <dt>Cancellation reason</dt><dd>{{ appointment.cancellation_reason }}</dd>
-    {% endif %}
-</dl>
-
-{% if can_cancel or can_reschedule %}
-    <div class="row-actions">
-        {% if can_reschedule %}
-            <a class="btn btn-secondary" href="{% url 'appointments:reschedule' appointment.reference %}">Reschedule</a>
-        {% endif %}
-        {% if can_cancel %}
-            <a class="btn btn-secondary danger" href="{% url 'appointments:cancel' appointment.reference %}">Cancel appointment</a>
-        {% endif %}
+    <div class="page-head">
+        <span class="section-rule" aria-hidden="true"></span>
+        <h1>Appointment details</h1>
     </div>
-{% endif %}
+
+    <div class="ticket">
+        <div class="ticket__main">
+            <p class="ticket__label">Appointment reference</p>
+            <p class="ticket__ref" translate="no">{{ appointment.reference }}</p>
+            <div class="ticket__person">
+                {% doctor_portrait appointment.doctor as portrait_url %}
+                {% if portrait_url %}
+                    <span class="avatar avatar--photo" aria-hidden="true"><img src="{{ portrait_url }}" alt="" loading="lazy" decoding="async" width="96" height="96"></span>
+                {% else %}
+                    <span class="avatar" aria-hidden="true">{{ appointment.doctor.user.first_name|slice:":1" }}{{ appointment.doctor.user.last_name|slice:":1" }}</span>
+                {% endif %}
+                <div class="ticket__person__body">
+                    <p class="ticket__person__name">Dr. {{ appointment.doctor.user.get_full_name }} <span class="pill">{{ appointment.doctor.speciality.name }}</span></p>
+                    <p class="ticket__person__meta">Patient: {{ appointment.patient.get_full_name }}</p>
+                </div>
+            </div>
+            <dl class="detail-list mb-0">
+                {% if appointment.reason %}<dt>Reason</dt><dd>{{ appointment.reason }}</dd>{% endif %}
+            </dl>
+        </div>
+        <div class="ticket__stub">
+            <span class="ticket__date">{{ appointment.date|date:"D j M Y" }}</span>
+            <span class="ticket__time">{{ appointment.start_time|time:"H:i" }}–{{ appointment.end_time|time:"H:i" }}</span>
+            <span class="ticket__status">{% include "appointments/_status_badge.html" with appointment=appointment %}</span>
+        </div>
+    </div>
+
+    <section class="section mt-6">
+        <span class="section-rule" aria-hidden="true"></span>
+        <h2 class="section-title">More information</h2>
+        <dl class="detail-list">
+            <dt>Booked</dt><dd>{{ appointment.created_at|date:"j M Y, H:i" }}</dd>
+            {% if appointment.cancelled_by %}
+                <dt>Cancelled by</dt><dd>{{ appointment.cancelled_by.get_full_name }}</dd>
+            {% endif %}
+            {% if appointment.cancellation_reason %}
+                <dt>Cancellation reason</dt><dd>{{ appointment.cancellation_reason }}</dd>
+            {% endif %}
+        </dl>
+    </section>
+
+    {% if can_cancel or can_reschedule %}
+        <section class="section" aria-labelledby="actions-heading">
+            <span class="section-rule" aria-hidden="true"></span>
+            <h2 class="section-title" id="actions-heading">Manage this appointment</h2>
+            <div class="cluster">
+                {% if can_reschedule %}
+                    <a class="btn btn--secondary" href="{% url 'appointments:reschedule' appointment.reference %}">Reschedule</a>
+                {% endif %}
+                {% if can_cancel %}
+                    <a class="btn btn--danger" href="{% url 'appointments:cancel' appointment.reference %}">Cancel appointment</a>
+                {% endif %}
+            </div>
+        </section>
+    {% endif %}
+</div>
 {% endblock %}

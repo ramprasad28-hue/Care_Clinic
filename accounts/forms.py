@@ -17,7 +17,7 @@ class EmailAuthenticationForm(AuthenticationForm):
     username = UsernameField(
         label="Email",
         widget=forms.EmailInput(
-            attrs={"autofocus": True, "autocomplete": "email"}
+            attrs={"autofocus": True, "autocomplete": "email", "spellcheck": "false"}
         ),
     )
 
@@ -28,6 +28,23 @@ class PatientRegistrationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = User
         fields = ("first_name", "last_name", "email", "phone")
+        widgets = {
+            "first_name": forms.TextInput(attrs={"autocomplete": "given-name"}),
+            "last_name": forms.TextInput(attrs={"autocomplete": "family-name"}),
+            "email": forms.EmailInput(
+                attrs={"autocomplete": "email", "spellcheck": "false"}
+            ),
+            "phone": forms.TextInput(
+                attrs={"type": "tel", "inputmode": "tel", "autocomplete": "tel"}
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("password1", "password2"):
+            self.fields[field_name].widget.attrs.update(
+                {"autocomplete": "new-password"}
+            )
 
     def clean_email(self):
         email = User.objects.normalize_email(self.cleaned_data["email"])

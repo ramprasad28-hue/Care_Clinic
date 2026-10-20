@@ -1,54 +1,102 @@
 {% extends "base.html" %}
+{% load static %}
+{% load clinic_images %}
 
 {% block title %}Book with Dr. {{ doctor.user.get_full_name }} — Care_Clinic{% endblock %}
 
 {% block content %}
-<p class="breadcrumb">
-    <a href="{% url 'doctor_list' %}">Doctors</a> /
-    <a href="{{ doctor.get_absolute_url }}">Dr. {{ doctor.user.get_full_name }}</a> /
-    Book
-</p>
+<div class="container">
+    <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb">
+            <li><a href="{% url 'doctor_list' %}">Doctors</a></li>
+            <li><a href="{{ doctor.get_absolute_url }}">Dr. {{ doctor.user.get_full_name }}</a></li>
+            <li aria-current="page">Book</li>
+        </ol>
+    </nav>
 
-<h1>Book an appointment</h1>
-<p class="lead">Dr. {{ doctor.user.get_full_name }} · {{ doctor.speciality.name }}</p>
+    <div class="page-head">
+        <span class="section-rule" aria-hidden="true"></span>
+        <h1>Book an appointment</h1>
+    </div>
 
-{% if dates %}
-    <section>
-        <h2>Choose a date</h2>
-        <ul class="date-nav">
-            {% for d in dates %}
-                <li>
-                    <a class="date-chip {% if d == selected_day %}is-active{% endif %}"
-                       href="?date={{ d|date:'Y-m-d' }}">{{ d|date:"D j M" }}</a>
-                </li>
-            {% endfor %}
-        </ul>
-    </section>
-
-    <section>
-        <h2>Available slots on {{ selected_day|date:"D j M Y" }}</h2>
-        {% if slots %}
-            <form method="post" class="booking-form">
-                {% csrf_token %}
-                <input type="hidden" name="date" value="{{ selected_day|date:'Y-m-d' }}">
-                {{ form.slot.errors }}
-                <div class="slot-grid">
-                    {% for radio in form.slot %}
-                        <label class="slot-option">{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>
-                    {% endfor %}
-                </div>
-                <p>
-                    {{ form.reason.label_tag }}
-                    {{ form.reason }}
-                    {{ form.reason.errors }}
-                </p>
-                <button type="submit" class="btn btn-primary">Confirm booking</button>
-            </form>
+    <section class="booking-doctor" aria-label="Doctor for this appointment">
+        {% doctor_portrait doctor as portrait_url %}
+        {% if portrait_url %}
+            <span class="avatar avatar--photo" aria-hidden="true"><img src="{{ portrait_url }}" alt="" loading="eager" decoding="async" width="96" height="96"></span>
         {% else %}
-            <p class="muted">No open slots on this date. Please pick another date.</p>
+            <span class="avatar" aria-hidden="true">{{ doctor.user.first_name|slice:":1" }}{{ doctor.user.last_name|slice:":1" }}</span>
         {% endif %}
+        <div class="booking-doctor__body">
+            <p class="booking-doctor__name">Dr. {{ doctor.user.get_full_name }} <span class="pill">{{ doctor.speciality.name }}</span></p>
+            <p class="booking-doctor__meta">Choose a date, then a time — you will confirm before anything is booked.</p>
+        </div>
+        <a class="booking-doctor__link" href="{{ doctor.get_absolute_url }}">View profile</a>
     </section>
-{% else %}
-    <p class="muted">This doctor has no availability in the next three weeks.</p>
-{% endif %}
+
+    {% if dates %}
+        <section class="section" aria-labelledby="date-heading">
+            <span class="section-rule" aria-hidden="true"></span>
+            <h2 class="section-title" id="date-heading">Choose a date</h2>
+            <ul class="date-nav">
+                {% for d in dates %}
+                    <li>
+                        <a class="date-chip {% if d == selected_day %}is-active{% endif %}"
+                           href="?date={{ d|date:'Y-m-d' }}"
+                           {% if d == selected_day %}aria-current="date"{% endif %}>
+                            <span class="date-chip__dow">{{ d|date:"D" }}</span>
+                            {{ d|date:"j M" }}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+
+        <section class="section" aria-labelledby="slot-heading">
+            <span class="section-rule" aria-hidden="true"></span>
+            <h2 class="section-title" id="slot-heading">Available slots on {{ selected_day|date:"D j M Y" }}</h2>
+            {% if slots %}
+                <form method="post" class="form" novalidate data-guard data-slot-form>
+                    {% csrf_token %}
+                    {% include "partials/_form_errors.html" with form=form %}
+                    <input type="hidden" name="date" value="{{ selected_day|date:'Y-m-d' }}">
+
+                    <fieldset class="field">
+                        <legend class="field__label">Choose a time</legend>
+                        <div class="slot-grid">
+                            {% for radio in form.slot %}
+                                <label class="slot-option">
+                                    {{ radio.tag }}
+                                    <span class="slot-time">{{ radio.choice_label }}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                        {% for error in form.slot.errors %}<span class="field__error">{{ error }}</span>{% endfor %}
+                    </fieldset>
+
+                    <div class="booking-summary" aria-live="polite">
+                        <p class="booking-summary__label">Appointment summary</p>
+                        <ul>
+                            <li><span>Doctor</span><strong>Dr. {{ doctor.user.get_full_name }} · {{ doctor.speciality.name }}</strong></li>
+                            <li><span>Date</span><strong>{{ selected_day|date:"D j M Y" }}</strong></li>
+                            <li><span>Time</span><strong data-slot-summary-time>Not selected yet</strong></li>
+                        </ul>
+                    </div>
+
+                    {% include "partials/_field.html" with field=form.reason %}
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn--primary">Confirm booking</button>
+                    </div>
+                </form>
+            {% else %}
+                <div class="empty empty--inline">
+                    <h2>No open slots on this date</h2>
+                    <p>Dr. {{ doctor.user.get_full_name }} is not taking bookings on {{ selected_day|date:"D j M Y" }}. Pick another date from the list above.</p>
+                </div>
+            {% endif %}
+        </section>
+    {% else %}
+        {% include "partials/_empty.html" with title="No availability yet" text="This doctor has no availability in the next three weeks." action_url=doctor.get_absolute_url action_label="Back to profile" show_action=1 %}
+    {% endif %}
+</div>
 {% endblock %}

@@ -198,6 +198,35 @@ class PatientDashboardTests(TestCase):
         response = self.client.get(reverse("dashboards:patient"))
         self.assertFalse(response.context["upcoming"][0].can_manage)
 
+    def test_upcoming_excludes_cancelled_appointments(self):
+        cancelled = make_appointment(
+            self.patient,
+            self.doctor,
+            future_day(7),
+            start=time(11, 0),
+            status=AppointmentStatus.CANCELLED,
+        )
+        self.client.force_login(self.patient)
+        response = self.client.get(reverse("dashboards:patient"))
+        pks = {a.pk for a in response.context["upcoming"]}
+        self.assertNotIn(cancelled.pk, pks)
+        self.assertNotContains(response, cancelled.reference)
+        # A future active appointment remains visible in Upcoming.
+        self.assertIn(self.mine.pk, pks)
+        self.assertContains(response, self.mine.reference)
+
+    def test_cancelled_future_still_available_on_list(self):
+        cancelled = make_appointment(
+            self.patient,
+            self.doctor,
+            future_day(7),
+            start=time(11, 0),
+            status=AppointmentStatus.CANCELLED,
+        )
+        self.client.force_login(self.patient)
+        response = self.client.get(reverse("appointments:list"))
+        self.assertContains(response, cancelled.reference)
+
     def test_book_link_present(self):
         self.client.force_login(self.patient)
         response = self.client.get(reverse("dashboards:patient"))
@@ -547,3 +576,97 @@ class DashboardReadOnlyTests(TestCase):
         self.client.get(reverse("dashboards:doctor"))
         appt.refresh_from_db()
         self.assertEqual((appt.status, appt.updated_at), before)
+
+
+# --------------------------------------------------------------------------
+# Presentation / accessibility contracts (Phase 7.5 editorial system)
+#
+# The dashboards are deliberately denser than the public pages, so these tests
+# lock the *shared* structural conventions (head scaffold, labelled sections,
+# focusable stacked tables, scoped column headers, compact status actions)
+# rather than any marketing/editorial-cover styling.
+# --------------------------------------------------------------------------
+class DashboardPresentationTests(TestCase):
+    def setUp(self):
+        self.patient = make_user("p@example.com")
+        self.doctor = make_doctor("d@example.com")
+        self.receptionist = make_user("r@example.com", User.Role.RECEPTIONIST)
+        self.admin = make_user("a@example.com", User.Role.ADMIN)
+        self.appointment = make_appointment(self.patient, self.doctor, future_day(4))
+
+    def test_dashboards_use_shared_head_scaffold_and_single_h1(self):
+        for user, name in (
+            (self.patient, "dashboards:patient"),
+            (self.doctor.user, "dashboards:doctor"),
+            (self.receptionist, "dashboards:receptionist"),
+            (self.admin, "dashboards:admin"),
+        ):
+            with self.subTest(dashboard=name):
+                self.client.force_login(user)
+                response = self.client.get(reverse(name))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'class="dashboard__head"')
+                self.assertEqual(response.content.count(b"<h1"), 1)
+
+    def test_doctor_sections_are_labelled_by_their_headings(self):
+        self.client.force_login(self.doctor.user)
+        response = self.client.get(reverse("dashboards:doctor"))
+        for heading_id in ("today-heading", "upcoming-heading", "past-heading"):
+            with self.subTest(heading=heading_id):
+                self.assertContains(response, f'aria-labelledby="{heading_id}"')
+                self.assertContains(response, f'id="{heading_id}"')
+
+    def test_appointment_table_is_focusable_labelled_stacked_region(self):
+        self.client.force_login(self.receptionist)
+        response = self.client.get(reverse("dashboards:receptionist"))
+        self.assertContains(response, 'class="table-wrap table-wrap--stack"')
+        self.assertContains(response, 'tabindex="0"')
+        self.assertContains(response, 'role="region"')
+        self.assertContains(response, 'aria-label="Appointments"')
+        for column in ("Reference", "Date", "Time", "Doctor", "Patient", "Status"):
+            self.assertContains(response, f'<th scope="col">{column}</th>', html=False)
+        self.assertContains(response, 'data-label="Reference"')
+
+    def test_pagination_renders_as_labelled_nav_when_paged(self):
+        for i in range(12):
+            make_appointment(
+                self.patient, self.doctor, future_day(30 + i), start=time(9, 0)
+            )
+        self.client.force_login(self.receptionist)
+        response = self.client.get(reverse("dashboards:receptionist"))
+        self.assertContains(response, 'aria-label="Pagination"')
+        self.assertContains(response, "Page 1 of 2")
+        self.assertContains(response, "Next")
+        # The Previous link appears once a later page is requested.
+        response = self.client.get(reverse("dashboards:receptionist"), {"page": 2})
+        self.assertContains(response, "Previous")
+
+    def test_status_actions_use_compact_ghost_buttons(self):
+        self.client.force_login(self.doctor.user)
+        response = self.client.get(reverse("dashboards:doctor"))
+        self.assertContains(response, "btn btn--ghost btn--sm")
+
+    def test_admin_stat_cards_render_editorial_tokens(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("dashboards:admin"))
+        for token in ('class="stat-grid"', 'class="stat-card"',
+                      'class="stat-value"', 'class="stat-label"'):
+            with self.subTest(token=token):
+                self.assertContains(response, token)
+
+    def test_doctor_without_profile_uses_shared_empty_state(self):
+        user = make_user("nodoc@example.com", User.Role.DOCTOR)
+        self.client.force_login(user)
+        response = self.client.get(reverse("dashboards:doctor"))
+        self.assertContains(response, 'class="empty"')
+        self.assertContains(response, "No doctor profile")
+
+    def test_no_dashboard_renders_notice_with_home_link(self):
+        user = make_user("weird@example.com")
+        User.objects.filter(pk=user.pk).update(role="MYSTERY")
+        user.refresh_from_db()
+        self.client.force_login(user)
+        response = self.client.get(reverse("dashboards:landing"))
+        self.assertContains(response, 'class="notice"')
+        self.assertContains(response, "<h1>No dashboard</h1>", html=False)
+        self.assertContains(response, reverse("home"))

@@ -1,0 +1,79 @@
+{% comment %}
+Photo-ready figure plate. Renders the original in-repo SVG illustration by
+default, or a self-hosted photograph when `image_url` is supplied — so an
+approved, licensed clinic image can drop into the same slot later with no
+markup change.
+
+The default illustration is a product-true scheduling scene — a week of
+availability with one slot confirmed, open slots and a dotted route from the
+booked time to the next opening. It is decorative (aria-hidden); the meaning is
+always carried by the real caption text. No clinical imagery, no invented
+claims, no external asset, no CDN (ADR-020).
+
+Params:
+  caption     — honest caption text shown under the plate (required)
+  size        — modifier key, e.g. "lg" for the homepage visual band (optional)
+  image_url   — a self-hosted image path; if set, an <img> is rendered instead
+                of the illustration (optional)
+  image_alt   — alt text for that image (optional; omitted/empty = decorative)
+  width       — intrinsic image width in px (recommended when image_url is set)
+  height      — intrinsic image height in px (recommended when image_url is set)
+  loading     — loading attribute for the image (defaults to "lazy")
+{% endcomment %}
+<figure class="figure-plate{% if size %} figure-plate--{{ size }}{% endif %}">
+    <div class="figure-plate__frame">
+        {% if image_url %}
+            <img src="{{ image_url }}"{% if image_alt %} alt="{{ image_alt }}"{% else %} alt=""{% endif %}{% if width %} width="{{ width }}"{% endif %}{% if height %} height="{{ height }}"{% endif %} loading="{{ loading|default:'lazy' }}" decoding="async">
+        {% else %}
+            <svg viewBox="0 0 720 480" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" role="presentation" aria-hidden="true" focusable="false">
+                <rect x="56" y="48" width="608" height="368" rx="28" fill="#ffffff"/>
+                <path d="M88 112h544" fill="none" stroke="#0b7c80" stroke-opacity="0.22" stroke-width="2.5"/>
+
+                <g fill="none" stroke="#0b7c80" stroke-opacity="0.16" stroke-width="2.5">
+                    <path d="M80 112v280M160 112v280M240 112v280M320 112v280M400 112v280M480 112v280M560 112v280M640 112v280"/>
+                    <path d="M80 182h560M80 252h560M80 322h560"/>
+                </g>
+
+                <g fill="#0b7c80" fill-opacity="0.45">
+                    <rect x="112" y="80" width="36" height="7" rx="3.5"/>
+                    <rect x="192" y="80" width="36" height="7" rx="3.5"/>
+                    <rect x="272" y="80" width="36" height="7" rx="3.5"/>
+                    <rect x="352" y="80" width="36" height="7" rx="3.5"/>
+                    <rect x="432" y="80" width="36" height="7" rx="3.5"/>
+                    <rect x="512" y="80" width="36" height="7" rx="3.5"/>
+                    <rect x="592" y="80" width="36" height="7" rx="3.5"/>
+                </g>
+
+                <g fill="none" stroke="#0ea5a8" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 10">
+                    <path d="M544 96v284"/>
+                </g>
+                <circle cx="544" cy="90" r="5" fill="#0ea5a8"/>
+
+                <rect x="248" y="126" width="64" height="46" rx="12" fill="#0b7c80"/>
+                <path d="M266 149l6 6 12-13" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+                <rect x="488" y="196" width="64" height="46" rx="12" fill="#e8f8f8" stroke="#0b7c80" stroke-opacity="0.5" stroke-width="2.5"/>
+
+                <g fill="#ffffff" stroke="#0b7c80" stroke-width="2.5">
+                    <rect x="88" y="196" width="64" height="46" rx="12" stroke-opacity="0.4"/>
+                    <rect x="328" y="266" width="64" height="46" rx="12" stroke-opacity="0.3"/>
+                    <rect x="568" y="266" width="64" height="46" rx="12" stroke-opacity="0.3"/>
+                    <rect x="168" y="336" width="64" height="46" rx="12" stroke-opacity="0.25"/>
+                    <rect x="248" y="336" width="64" height="46" rx="12" stroke-opacity="0.2"/>
+                </g>
+                <g fill="#0b7c80" fill-opacity="0.3">
+                    <circle cx="120" cy="219" r="3"/>
+                    <circle cx="360" cy="289" r="3"/>
+                    <circle cx="600" cy="289" r="3"/>
+                    <circle cx="200" cy="359" r="3"/>
+                    <circle cx="280" cy="359" r="3"/>
+                </g>
+
+                <circle cx="320" cy="149" r="4.5" fill="#0ea5a8"/>
+                <path d="M320 149C400 149 400 219 470 219" fill="none" stroke="#0ea5a8" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 12"/>
+                <path d="M462 210l9 9-9 9" fill="none" stroke="#0ea5a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        {% endif %}
+    </div>
+    {% if caption %}<figcaption class="figure-plate__caption">{{ caption }}</figcaption>{% endif %}
+</figure>

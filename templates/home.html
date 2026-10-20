@@ -1,43 +1,195 @@
 {% extends "base.html" %}
+{% load static %}
+{% load clinic_images %}
 
-{% block title %}Care_Clinic — Home{% endblock %}
+{% block title %}Care_Clinic — Book clinic appointments{% endblock %}
+{% block main_class %}main--flush{% endblock %}
+{% block header_class %} site-header--hero{% endblock %}
 
 {% block content %}
+{% section_image 'home_hero' as hero_photo %}
 <section class="hero">
-    <h1>Care_Clinic</h1>
-    <p class="lead">Find the right speciality and doctor, and book your visit with confidence.</p>
-    <p><a class="btn btn-primary" href="{% url 'doctor_list' %}">Browse doctors</a></p>
+    {% if hero_photo %}
+    <img class="hero__bg"
+         src="{{ hero_photo.url }}"
+         alt="{{ hero_photo.alt }}"
+         aria-hidden="true"
+         width="1600" height="1200"
+         fetchpriority="high" decoding="async">
+    {% endif %}
+    <div class="container hero__grid">
+        <div class="hero__copy">
+            <span class="hero-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg>
+                Clinic appointment management
+            </span>
+            <h1>Care that fits your schedule.</h1>
+            <p class="hero__lead">
+                Browse clinical specialities, find a doctor who is accepting
+                appointments, and choose an open time — then view, reschedule, or
+                cancel your visit from one place.
+            </p>
+            <div class="hero__actions">
+                <a class="btn btn--primary btn--lg btn--arrow" href="{% url 'doctor_list' %}">Book an appointment<span class="btn__disc" aria-hidden="true"><svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+                <a class="btn btn--secondary btn--lg" href="#doctors">Find a doctor</a>
+            </div>
+        </div>
+
+        <div class="hero__panel">
+            <h2>Find a doctor</h2>
+            <p>Pick a speciality to see doctors who are accepting appointments.</p>
+            <form method="get" action="{% url 'doctor_list' %}">
+                <div class="field mb-3">
+                    <label class="field__label" for="hero-speciality">Speciality</label>
+                    <select name="speciality" id="hero-speciality">
+                        <option value="">All specialities</option>
+                        {% for speciality in specialities %}
+                            <option value="{{ speciality.slug }}">{{ speciality.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn--primary btn--block">See doctors</button>
+            </form>
+        </div>
+    </div>
 </section>
 
-<section>
-    <h2>Specialities</h2>
-    {% if specialities %}
-        <ul class="card-grid">
-            {% for speciality in specialities %}
-                <li class="card">
-                    <a class="card-title" href="{{ speciality.get_absolute_url }}">{{ speciality.name }}</a>
-                    <p class="muted">{{ speciality.description|default:"—"|truncatewords:18 }}</p>
+{% if speciality_count or doctor_count %}
+<section class="band band--compact reveal" aria-label="Clinic at a glance">
+    <div class="container">
+        <ul class="trust-strip">
+            {% if speciality_count %}
+                <li class="trust-item">
+                    <span class="trust-value">{{ speciality_count }}</span>
+                    <span class="trust-label">Active specialit{{ speciality_count|pluralize:"y,ies" }}</span>
                 </li>
-            {% endfor %}
+            {% endif %}
+            {% if doctor_count %}
+                <li class="trust-item">
+                    <span class="trust-value">{{ doctor_count }}</span>
+                    <span class="trust-label">Doctor{{ doctor_count|pluralize }} accepting appointments</span>
+                </li>
+            {% endif %}
         </ul>
-    {% else %}
-        <p class="muted">No specialities are available yet.</p>
-    {% endif %}
+    </div>
+</section>
+{% endif %}
+
+<section class="band band--viz reveal" aria-labelledby="viz-heading">
+    <div class="container viz-grid">
+        {% include "partials/_figure_plate.html" with size="lg" caption="A week of availability with one time confirmed. Every slot shown on Care_Clinic is a real, open time taken from the doctor's own schedule." %}
+        <div class="viz-rail">
+            <span class="section-rule" aria-hidden="true"></span>
+            <span class="eyebrow">How booking works</span>
+            <h2 class="section-title" id="viz-heading">From open time to booked visit</h2>
+            <p class="section-intro">
+                Every doctor is listed with the times they have genuinely opened. Choose
+                the slot that suits you and book it directly — no phone calls, no
+                guesswork.
+            </p>
+        </div>
+    </div>
 </section>
 
-<section>
-    <h2>Our doctors</h2>
-    {% if doctors %}
-        <ul class="card-grid">
-            {% for doctor in doctors %}
-                <li class="card">
-                    <a class="card-title" href="{{ doctor.get_absolute_url }}">Dr. {{ doctor.user.get_full_name }}</a>
-                    <p class="muted">{{ doctor.speciality.name }}{% if doctor.qualification %} · {{ doctor.qualification }}{% endif %}</p>
+<section class="band band--tint reveal" aria-labelledby="about-heading">
+    {% section_image 'home_about' as about_photo %}
+    <div class="container about-grid">
+        <div class="about-copy">
+            <span class="section-rule" aria-hidden="true"></span>
+            <span class="eyebrow">About the clinic</span>
+            <h2 class="section-title" id="about-heading">A simpler way to arrange your care</h2>
+            <p class="section-intro">
+                Care_Clinic brings specialities, doctors, and availability together so
+                you can find the right appointment without phone calls or guesswork.
+            </p>
+            <p>
+                Every doctor listed here is accepting appointments, and every time you
+                see is a real, open slot generated from that doctor's own weekly
+                availability — so what you book is what you get.
+            </p>
+            <ol class="about-steps">
+                <li>
+                    <strong>Find the right speciality</strong>
+                    Browse by the care you need, or look up a specific doctor.
                 </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p class="muted">No doctors are available yet.</p>
-    {% endif %}
+                <li>
+                    <strong>Choose an open time</strong>
+                    See genuine availability across the coming weeks.
+                </li>
+                <li>
+                    <strong>Book, cancel, or reschedule</strong>
+                    Manage your visit from one place, with a reference to keep.
+                </li>
+            </ol>
+        </div>
+        {% if about_photo %}
+            {% include "partials/_figure_plate.html" with image_url=about_photo.url image_alt=about_photo.alt width="1200" height="960" loading="lazy" caption=about_photo.caption %}
+        {% endif %}
+    </div>
+</section>
+
+<section class="band reveal" aria-labelledby="services-heading">
+    <div class="container">
+        <div class="band__head">
+            <span class="section-rule" aria-hidden="true"></span>
+            <span class="eyebrow">Specialities</span>
+            <h2 class="section-title" id="services-heading">Care across our clinical specialities</h2>
+            <p class="section-intro">
+                Explore the specialities offered by the clinic. Choose one to see the
+                doctors working in it and their open times.
+            </p>
+        </div>
+
+        {% if specialities %}
+            <ul class="service-grid">
+                {% for speciality in specialities %}
+                    {% include "partials/_speciality_card.html" with speciality=speciality %}
+                {% endfor %}
+            </ul>
+            <p class="band__more"><a class="btn btn--secondary" href="{% url 'speciality_list' %}">View all specialities</a></p>
+        {% else %}
+            {% include "partials/_empty.html" with mark="+" level=3 title="No specialities yet" text="Specialities will appear here once the clinic publishes them." %}
+        {% endif %}
+    </div>
+</section>
+
+<section class="band band--tint reveal" id="doctors" aria-labelledby="doctors-heading">
+    <div class="container">
+        <div class="band__head">
+            <span class="section-rule" aria-hidden="true"></span>
+            <span class="eyebrow">Our doctors</span>
+            <h2 class="section-title" id="doctors-heading">Meet the doctors accepting appointments</h2>
+            <p class="section-intro">
+                Each profile shows the doctor's speciality, qualifications, and weekly
+                availability.
+            </p>
+        </div>
+
+        {% if doctors %}
+            <ul class="doctor-grid">
+                {% for doctor in doctors %}
+                    {% include "partials/_doctor_card.html" with doctor=doctor %}
+                {% endfor %}
+            </ul>
+            <p class="band__more"><a class="btn btn--secondary" href="{% url 'doctor_list' %}">View all doctors</a></p>
+        {% else %}
+            {% include "partials/_empty.html" with mark="+" level=3 title="No doctors listed yet" text="Doctors who are accepting appointments will appear here." %}
+        {% endif %}
+    </div>
+</section>
+
+<section class="band cta-band reveal" aria-labelledby="cta-heading">
+    <div class="container cta-band__inner">
+        <div>
+            <h2 id="cta-heading">Ready to book your visit?</h2>
+            <p>Choose a speciality or a doctor and pick an open time that suits you.</p>
+        </div>
+        <div class="hero__actions">
+            <a class="btn btn--inverse btn--lg btn--arrow" href="{% url 'doctor_list' %}">Book an appointment<span class="btn__disc" aria-hidden="true"><svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+            {% if not user.is_authenticated %}
+                <a class="btn btn--secondary btn--lg" href="{% url 'accounts:register' %}">Create an account</a>
+            {% endif %}
+        </div>
+    </div>
 </section>
 {% endblock %}

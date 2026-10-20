@@ -2,7 +2,7 @@
 
 **Phase:** 1 — Architecture (planning only)
 **Stack:** Python 3.12 · Django 5.2 LTS · MySQL (InnoDB) · mysqlclient · Django Templates ·
-HTML/CSS/Bootstrap 5/vanilla JS · Django ORM · Git/GitHub
+HTML/CSS (hand-built design system, no framework)/vanilla JS · Django ORM · Git/GitHub
 
 **Non-negotiables:** server-rendered Django only. No React, Next.js, microservices,
 message brokers, or extra infrastructure. Nothing in this document implies code exists yet.
@@ -187,7 +187,8 @@ rejected (e.g. cancelling a `COMPLETED` appointment).
   CTAs (WCAG AA contrast); status colors reserved strictly for appointment states.
 - Typography: one humanist sans for UI, one for headings; generous whitespace; large tap targets.
 - Imagery: original CSS/SVG placeholders and abstract medical motifs only.
-- Bootstrap 5 grid/components as the base, customized via CSS variables (no heavy theme).
+- Hand-built CSS design system (tokens + components; no framework, no build step) — see
+  ADR-020. Layout uses CSS grid/flexbox and is CSS-first responsive.
 
 ### 8.2 Screen plan
 

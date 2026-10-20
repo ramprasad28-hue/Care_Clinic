@@ -1,0 +1,10 @@
+{% comment %}
+Reusable form field: label (with required marker), widget, help text and
+field-level errors. Expects `field` in context.
+{% endcomment %}
+<div class="field{% if field.errors %} field--error{% endif %}">
+    <label class="field__label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="field__req" aria-hidden="true"> *</span>{% endif %}</label>
+    {{ field }}
+    {% if field.help_text %}<span class="field__help">{{ field.help_text }}</span>{% endif %}
+    {% for error in field.errors %}<span class="field__error">{{ error }}</span>{% endfor %}
+</div>

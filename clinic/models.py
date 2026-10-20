@@ -5,7 +5,9 @@ This app owns the *catalog* and *scheduling configuration* only. Booking
 app. The field set follows ``docs/data-model.md`` with two documented,
 justified additions to ``Doctor`` (``slug`` and ``consultation_fee``) and one
 deliberate omission (``profile_image``) — see ``docs/decisions.md``
-ADR-013/ADR-014/ADR-015.
+ADR-013/ADR-014/ADR-015. ADR-022 (phase C1) supersedes the ADR-015 omission:
+``Doctor.profile_image`` and ``Speciality.image`` are administrator-managed
+uploads; ``None`` keeps the pre-C1 rendering untouched.
 
 Integrity approach:
 * ``CheckConstraint`` enforces time/date ordering at the database level.
@@ -30,6 +32,18 @@ class Weekday(models.IntegerChoices):
     FRIDAY = 4, _("Friday")
     SATURDAY = 5, _("Saturday")
     SUNDAY = 6, _("Sunday")
+
+
+def speciality_image_path(instance, filename):
+    """Upload scope for speciality tiles (never touches source-controlled static/)."""
+    ext = (filename.rsplit(".", 1)[-1] or "jpg").lower()
+    return f"specialities/{instance.slug or 'unassigned'}/card.{ext}"
+
+
+def doctor_profile_image_path(instance, filename):
+    """Upload scope for doctor portraits (never touches source-controlled static/)."""
+    ext = (filename.rsplit(".", 1)[-1] or "jpg").lower()
+    return f"doctors/{instance.slug or 'unassigned'}/profile.{ext}"
 
 
 def unique_slug(model, value, max_length=160):
@@ -59,6 +73,26 @@ class Speciality(models.Model):
         _("active"),
         default=True,
         help_text=_("Inactive specialities are hidden from the public site."),
+    )
+    # ADR-022 (C1): administrator-managed card/hero image. Uploads live under
+    # MEDIA_ROOT (never source-controlled static/img); unset keeps the
+    # documented static fallback chain untouched.
+    image = models.ImageField(
+        _("image"),
+        upload_to=speciality_image_path,
+        null=True,
+        blank=True,
+        help_text=_(
+            "Optional administrator-uploaded image used wherever the speciality "
+            "tile/hero renders (overrides the static placeholder). Set a short "
+            "honest caption to describe it."
+        ),
+    )
+    image_caption = models.CharField(
+        _("image caption"),
+        max_length=255,
+        blank=True,
+        help_text=_("Shown with the speciality detail hero when an image is set."),
     )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
@@ -141,6 +175,29 @@ class Doctor(models.Model):
     )
     is_accepting_appointments = models.BooleanField(
         _("accepting appointments"), default=True
+    )
+    # ADR-022 (C1): administrator-managed portrait (supersedes ADR-015).
+    # Unset keeps the initials/placeholder fallback chain untouched. An
+    # upload is presumed a genuine, consented photograph of this doctor
+    # (docs/imagery-licensing.md honesty rules).
+    profile_image = models.ImageField(
+        _("profile image"),
+        upload_to=doctor_profile_image_path,
+        null=True,
+        blank=True,
+        help_text=_(
+            "Optional administrator-uploaded portrait of this doctor; overrides "
+            "the static placeholder and, when absent, the initials avatar."
+        ),
+    )
+    profile_image_caption = models.CharField(
+        _("profile image caption"),
+        max_length=255,
+        blank=True,
+        help_text=_(
+            "Optional honest caption describing the portrait "
+            "(e.g. source/consent reference for the imagery manifest)."
+        ),
     )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)

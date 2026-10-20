@@ -1,48 +1,105 @@
 {% extends "base.html" %}
+{% load static %}
+{% load clinic_images %}
 
 {% block title %}Reschedule {{ appointment.reference }} — Care_Clinic{% endblock %}
 
 {% block content %}
-<p class="breadcrumb"><a href="{{ appointment.get_absolute_url }}">{{ appointment.reference }}</a> / Reschedule</p>
+<div class="container">
+    <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb">
+            <li><a href="{{ appointment.get_absolute_url }}">{{ appointment.reference }}</a></li>
+            <li aria-current="page">Reschedule</li>
+        </ol>
+    </nav>
 
-<h1>Reschedule appointment</h1>
-<p class="lead">
-    Currently {{ appointment.date|date:"D j M Y" }} at {{ appointment.start_time|time:"H:i" }} with
-    Dr. {{ appointment.doctor.user.get_full_name }}.
-</p>
+    <div class="page-head">
+        <span class="section-rule" aria-hidden="true"></span>
+        <h1>Reschedule appointment</h1>
+        <p>
+            Currently {{ appointment.date|date:"D j M Y" }} at {{ appointment.start_time|time:"H:i" }}–{{ appointment.end_time|time:"H:i" }}
+            with Dr. {{ appointment.doctor.user.get_full_name }}. Your current appointment stays as it is until you confirm a new slot.
+        </p>
+    </div>
 
-{% if dates %}
-    <section>
-        <h2>Choose a new date</h2>
-        <ul class="date-nav">
-            {% for d in dates %}
-                <li>
-                    <a class="date-chip {% if d == selected_day %}is-active{% endif %}"
-                       href="?date={{ d|date:'Y-m-d' }}">{{ d|date:"D j M" }}</a>
-                </li>
-            {% endfor %}
-        </ul>
-    </section>
-
-    <section>
-        <h2>New slot on {{ selected_day|date:"D j M Y" }}</h2>
-        {% if slots %}
-            <form method="post" class="booking-form">
-                {% csrf_token %}
-                <input type="hidden" name="date" value="{{ selected_day|date:'Y-m-d' }}">
-                {{ form.slot.errors }}
-                <div class="slot-grid">
-                    {% for radio in form.slot %}
-                        <label class="slot-option">{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>
-                    {% endfor %}
-                </div>
-                <button type="submit" class="btn btn-primary">Confirm reschedule</button>
-            </form>
+    <section class="booking-doctor" aria-label="Doctor for this appointment">
+        {% doctor_portrait appointment.doctor as portrait_url %}
+        {% if portrait_url %}
+            <span class="avatar avatar--photo" aria-hidden="true"><img src="{{ portrait_url }}" alt="" loading="eager" decoding="async" width="96" height="96"></span>
         {% else %}
-            <p class="muted">No open slots on this date. Please pick another date.</p>
+            <span class="avatar" aria-hidden="true">{{ appointment.doctor.user.first_name|slice:":1" }}{{ appointment.doctor.user.last_name|slice:":1" }}</span>
         {% endif %}
+        <div class="booking-doctor__body">
+            <p class="booking-doctor__name">Dr. {{ appointment.doctor.user.get_full_name }} <span class="pill">{{ appointment.doctor.speciality.name }}</span></p>
+            <p class="booking-doctor__meta">Reference <strong translate="no">{{ appointment.reference }}</strong></p>
+        </div>
+        <a class="booking-doctor__link" href="{{ appointment.doctor.get_absolute_url }}">View profile</a>
     </section>
-{% else %}
-    <p class="muted">No availability to reschedule into right now.</p>
-{% endif %}
+
+    {% if dates %}
+        <section class="section" aria-labelledby="date-heading">
+            <span class="section-rule" aria-hidden="true"></span>
+            <h2 class="section-title" id="date-heading">Choose a new date</h2>
+            <ul class="date-nav">
+                {% for d in dates %}
+                    <li>
+                        <a class="date-chip {% if d == selected_day %}is-active{% endif %}"
+                           href="?date={{ d|date:'Y-m-d' }}"
+                           {% if d == selected_day %}aria-current="date"{% endif %}>
+                            <span class="date-chip__dow">{{ d|date:"D" }}</span>
+                            {{ d|date:"j M" }}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+
+        <section class="section" aria-labelledby="slot-heading">
+            <span class="section-rule" aria-hidden="true"></span>
+            <h2 class="section-title" id="slot-heading">New slot on {{ selected_day|date:"D j M Y" }}</h2>
+            {% if slots %}
+                <form method="post" class="form" novalidate data-guard data-slot-form>
+                    {% csrf_token %}
+                    {% include "partials/_form_errors.html" with form=form %}
+                    <input type="hidden" name="date" value="{{ selected_day|date:'Y-m-d' }}">
+
+                    <fieldset class="field">
+                        <legend class="field__label">Choose a time</legend>
+                        <div class="slot-grid">
+                            {% for radio in form.slot %}
+                                <label class="slot-option">
+                                    {{ radio.tag }}
+                                    <span class="slot-time">{{ radio.choice_label }}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                        {% for error in form.slot.errors %}<span class="field__error">{{ error }}</span>{% endfor %}
+                    </fieldset>
+
+                    <div class="booking-summary" aria-live="polite">
+                        <p class="booking-summary__label">Reschedule summary</p>
+                        <ul>
+                            <li><span>Doctor</span><strong>Dr. {{ appointment.doctor.user.get_full_name }} · {{ appointment.doctor.speciality.name }}</strong></li>
+                            <li><span>Current</span><strong>{{ appointment.date|date:"D j M Y" }} · {{ appointment.start_time|time:"H:i" }}</strong></li>
+                            <li><span>New date</span><strong>{{ selected_day|date:"D j M Y" }}</strong></li>
+                            <li><span>New time</span><strong data-slot-summary-time>Not selected yet</strong></li>
+                        </ul>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn--primary">Confirm reschedule</button>
+                        <a class="btn btn--secondary" href="{{ appointment.get_absolute_url }}">Keep current appointment</a>
+                    </div>
+                </form>
+            {% else %}
+                <div class="empty empty--inline">
+                    <h2>No open slots on this date</h2>
+                    <p>Nothing is open on {{ selected_day|date:"D j M Y" }}. Pick another date from the list above.</p>
+                </div>
+            {% endif %}
+        </section>
+    {% else %}
+        {% include "partials/_empty.html" with title="Nothing to reschedule into" text="No availability to reschedule into right now." action_url=appointment.get_absolute_url action_label="Back to appointment" show_action=1 %}
+    {% endif %}
+</div>
 {% endblock %}

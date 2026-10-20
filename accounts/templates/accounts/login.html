@@ -1,28 +1,56 @@
 {% extends "base.html" %}
 
+{% load static %}
+{% load clinic_images %}
+
 {% block title %}Log in — Care_Clinic{% endblock %}
 
 {% block content %}
-<section class="auth-panel">
-    <h1>Log in</h1>
-    <p class="muted">Sign in with your email address.</p>
+{% section_image 'auth_login_panel' as login_photo %}
+<div class="container">
+    <div class="auth-split">
+        <aside class="auth-visual" aria-label="Care_Clinic illustration">
+            {% if login_photo %}
+            <figure class="auth-visual__media">
+                <img src="{{ login_photo.url }}"
+                     alt="{{ login_photo.alt }}"
+                     loading="eager">
+            </figure>
+            {% endif %}
+            <div class="auth-visual__scrim" aria-hidden="true"></div>
+            <div class="auth-visual__content">
+                <span class="eyebrow">Care_Clinic</span>
+                <p class="auth-visual__quote">Find a speciality, choose a doctor, and book an open time — in one calm place.</p>
+                {% if login_photo and login_photo.caption %}
+                <p class="auth-visual__caption">{{ login_photo.caption }}</p>
+                {% elif not login_photo %}
+                <p class="auth-visual__caption">Illustrative stock photograph — not a Care_Clinic premises</p>
+                {% endif %}
+            </div>
+        </aside>
 
-    {% if form.non_field_errors %}
-        <ul class="errorlist">
-            {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
-        </ul>
-    {% endif %}
+        <section class="auth-card" aria-labelledby="login-heading">
+            <span class="section-rule" aria-hidden="true"></span>
+            <h1 id="login-heading">Log in</h1>
+            <p class="muted">Welcome back. Sign in with your email address.</p>
 
-    <form method="post" novalidate>
-        {% csrf_token %}
-        {{ form.as_p }}
-        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-        <button type="submit" class="btn btn-primary">Log in</button>
-    </form>
+            <form method="post" novalidate class="form">
+                {% csrf_token %}
+                {% include "partials/_form_errors.html" with form=form %}
+                {% for field in form %}
+                    {% include "partials/_field.html" with field=field %}
+                {% endfor %}
+                {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+                <div class="form-actions">
+                    <button type="submit" class="btn btn--primary btn--block">Log in</button>
+                </div>
+            </form>
 
-    <p class="auth-links">
-        New here? <a href="{% url 'accounts:register' %}">Create a patient account</a>.<br>
-        <a href="{% url 'accounts:password_reset' %}">Forgot your password?</a>
-    </p>
-</section>
+            <div class="auth-links">
+                <span>New here? <a href="{% url 'accounts:register' %}">Create a patient account</a></span>
+                <span><a href="{% url 'accounts:password_reset' %}">Forgot your password?</a></span>
+            </div>
+        </section>
+    </div>
+</div>
 {% endblock %}

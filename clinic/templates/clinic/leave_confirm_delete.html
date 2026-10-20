@@ -3,12 +3,17 @@
 {% block title %}Delete leave — Care_Clinic{% endblock %}
 
 {% block content %}
-<h1>Delete leave</h1>
-<p>Delete the leave from {{ object.start_date }} to {{ object.end_date }}?</p>
-
-<form method="post">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-primary">Delete</button>
-    <a class="btn btn-secondary" href="{% url 'clinic:leave_list' %}">Cancel</a>
-</form>
+<div class="container container--form">
+    <section class="confirm" aria-labelledby="delete-leave-heading">
+        <h1 id="delete-leave-heading">Delete leave</h1>
+        <p>Delete the leave from {{ object.start_date }} to {{ object.end_date }}?</p>
+        <form method="post" class="form">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn--danger">Delete</button>
+                <a class="btn btn--secondary" href="{% url 'clinic:leave_list' %}">Cancel</a>
+            </div>
+        </form>
+    </section>
+</div>
 {% endblock %}

@@ -3,88 +3,116 @@
 {% block title %}Book for a patient — Care_Clinic{% endblock %}
 
 {% block content %}
-<p class="breadcrumb">
-    <a href="{% url 'dashboards:receptionist' %}">Receptionist dashboard</a> / Book for a patient
-</p>
+<div class="container">
+    <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb">
+            <li><a href="{% url 'dashboards:receptionist' %}">Receptionist dashboard</a></li>
+            <li aria-current="page">Book for a patient</li>
+        </ol>
+    </nav>
 
-<h1>Book for a patient</h1>
-<p class="muted">Select a patient and doctor, choose a day, then pick an available slot.</p>
+    <div class="page-head">
+        <h1>Book for a patient</h1>
+        <p>Pick a patient and doctor, choose a day, then pick an available slot.</p>
+    </div>
 
-<form method="get" class="filter-form">
-    <p>
-        <label for="id_patient">Patient</label>
-        <select name="patient" id="id_patient" required>
-            <option value="">Select a patient…</option>
-            {% for patient in patients %}
-                <option value="{{ patient.pk }}"
-                    {% if selected_patient and selected_patient.pk == patient.pk %}selected{% endif %}>
-                    {{ patient.get_full_name }} ({{ patient.email }})
-                </option>
-            {% endfor %}
-        </select>
-    </p>
-    <p>
-        <label for="id_doctor">Doctor</label>
-        <select name="doctor" id="id_doctor" required>
-            <option value="">Select a doctor…</option>
-            {% for doctor in doctors %}
-                <option value="{{ doctor.pk }}"
-                    {% if selected_doctor and selected_doctor.pk == doctor.pk %}selected{% endif %}>
-                    Dr. {{ doctor.user.get_full_name }} — {{ doctor.speciality.name }}
-                </option>
-            {% endfor %}
-        </select>
-    </p>
-    <p>
-        <label for="id_date">Date</label>
-        <input type="date" name="date" id="id_date"
-               value="{{ selected_day|date:'Y-m-d' }}">
-    </p>
-    <p class="filter-actions">
-        <button type="submit" class="btn btn-secondary">Show slots</button>
-    </p>
-</form>
-
-{% if selected_doctor %}
-    <section>
-        <h2>Dr. {{ selected_doctor.user.get_full_name }} — {{ selected_day|date:"D j M Y" }}</h2>
-
-        {% if dates %}
-            <ul class="date-nav">
-                {% for day in dates %}
-                    <li>
-                        <a class="date-chip {% if day == selected_day %}is-active{% endif %}"
-                           href="?doctor={{ selected_doctor.pk }}{% if selected_patient %}&amp;patient={{ selected_patient.pk }}{% endif %}&amp;date={{ day|date:'Y-m-d' }}">
-                            {{ day|date:"D j M" }}
-                        </a>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-
-        {% if slots %}
-            <form method="post" class="booking-form">
-                {% csrf_token %}
-                {{ form.patient.as_hidden }}
-                {{ form.doctor.as_hidden }}
-                {{ form.date.as_hidden }}
-                {% if selected_patient %}
-                    <p>Booking for <strong>{{ selected_patient.get_full_name }}</strong> ({{ selected_patient.email }}).</p>
-                {% endif %}
-                <div class="slot-grid">
-                    {% for slot in slots %}
-                        <label class="slot-option">
-                            <input type="radio" name="slot" value="{{ slot.pk }}" required>
-                            {{ slot.start_time|time:"H:i" }}–{{ slot.end_time|time:"H:i" }}
-                        </label>
+    <form method="get" class="filters" role="search">
+        <div class="filters__grid">
+            <div class="field">
+                <label class="field__label" for="id_patient">Patient</label>
+                <select name="patient" id="id_patient" required>
+                    <option value="">Select a patient…</option>
+                    {% for patient in patients %}
+                        <option value="{{ patient.pk }}"
+                            {% if selected_patient and selected_patient.pk == patient.pk %}selected{% endif %}>
+                            {{ patient.get_full_name }} ({{ patient.email }})
+                        </option>
                     {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="id_doctor">Doctor</label>
+                <select name="doctor" id="id_doctor" required>
+                    <option value="">Select a doctor…</option>
+                    {% for doctor in doctors %}
+                        <option value="{{ doctor.pk }}"
+                            {% if selected_doctor and selected_doctor.pk == doctor.pk %}selected{% endif %}>
+                            Dr. {{ doctor.user.get_full_name }} — {{ doctor.speciality.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="id_date">Date</label>
+                <input type="date" name="date" id="id_date"
+                       value="{{ selected_day|date:'Y-m-d' }}">
+            </div>
+        </div>
+        <div class="filters__actions">
+            <button type="submit" class="btn btn--primary">Show slots</button>
+        </div>
+    </form>
+
+    {% if selected_doctor %}
+        <section class="section" aria-labelledby="slots-heading">
+            <div class="section-header">
+                <h2 id="slots-heading">Dr. {{ selected_doctor.user.get_full_name }} — {{ selected_day|date:"D j M Y" }}</h2>
+            </div>
+
+            {% if dates %}
+                <ul class="date-nav">
+                    {% for day in dates %}
+                        <li>
+                            <a class="date-chip {% if day == selected_day %}is-active{% endif %}"
+                               href="?doctor={{ selected_doctor.pk }}{% if selected_patient %}&amp;patient={{ selected_patient.pk }}{% endif %}&amp;date={{ day|date:'Y-m-d' }}">
+                                <span class="date-chip__dow">{{ day|date:"D" }}</span>
+                                {{ day|date:"j M" }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            {% if slots %}
+                <form method="post" class="form" novalidate data-guard data-slot-form>
+                    {% csrf_token %}
+                    {{ form.patient.as_hidden }}
+                    {{ form.doctor.as_hidden }}
+                    {{ form.date.as_hidden }}
+                    <div class="booking-summary" aria-live="polite">
+                        <p class="booking-summary__label">Booking summary</p>
+                        <ul>
+                            {% if selected_patient %}<li><span>Patient</span><strong>{{ selected_patient.get_full_name }} · {{ selected_patient.email }}</strong></li>{% endif %}
+                            <li><span>Doctor</span><strong>Dr. {{ selected_doctor.user.get_full_name }} · {{ selected_doctor.speciality.name }}</strong></li>
+                            <li><span>Date</span><strong>{{ selected_day|date:"D j M Y" }}</strong></li>
+                            <li><span>Time</span><strong data-slot-summary-time>Not selected yet</strong></li>
+                        </ul>
+                    </div>
+                    <fieldset class="field">
+                        <legend class="field__label">Choose a slot</legend>
+                        <div class="slot-grid">
+                            {% for slot in slots %}
+                                <label class="slot-option">
+                                    <input type="radio" name="slot" value="{{ slot.pk }}" required>
+                                    <span class="slot-time">{{ slot.start_time|time:"H:i" }}–{{ slot.end_time|time:"H:i" }}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                        {% for error in form.slot.errors %}<span class="field__error">{{ error }}</span>{% endfor %}
+                    </fieldset>
+                    {% include "partials/_form_errors.html" with form=form %}
+                    {% include "partials/_field.html" with field=form.reason %}
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn--primary">Book appointment</button>
+                    </div>
+                </form>
+            {% else %}
+                <div class="empty empty--inline">
+                    <h2>No open slots on this date</h2>
+                    <p>Dr. {{ selected_doctor.user.get_full_name }} is not taking bookings on {{ selected_day|date:"D j M Y" }}. Pick another date above.</p>
                 </div>
-                <p>{{ form.reason.label_tag }} {{ form.reason }}</p>
-                <p><button type="submit" class="btn btn-primary">Book appointment</button></p>
-            </form>
-        {% else %}
-            <p class="muted">No open slots for this doctor on that day. Try another date.</p>
-        {% endif %}
-    </section>
-{% endif %}
+            {% endif %}
+        </section>
+    {% endif %}
+</div>
 {% endblock %}

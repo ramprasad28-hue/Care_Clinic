@@ -1,376 +1,2851 @@
-/* Care_Clinic — minimal foundation styles (full design arrives in Phase 7). */
+﻿/* =====================================================================
+   Care_Clinic — design system
+   Direction: Hospic-inspired healthcare marketing — a bright, spacious
+   teal identity (deep-teal actions, light-teal tinted bands, white
+   surfaces) with rounded cards and generous spacing.
+   Type: a system serif for editorial display/page/section headings,
+   a system sans for UI, body copy and numerals, system mono for
+   identifiers (references, slot times).
+   ===================================================================== */
+
+/* --- Design tokens ------------------------------------------------ */
 :root {
-    --navy: #0f2033;
-    --teal: #0d7377;
-    --surface: #f5f7fa;
-    --text: #1a1a2e;
+    /* Approved Care_Clinic palette */
+    --color-primary: #0ea5a8;        /* primary healthcare teal */
+    --color-primary-dark: #0b7c80;   /* dark teal — AA text on white */
+    --color-primary-darker: #086063; /* pressed states / dark surfaces */
+    --color-primary-soft: #e8f8f8;   /* light teal surface */
+    --color-surface: #ffffff;
+    --color-text: #1f2937;
+    --color-text-muted: #6b7280;
+    --color-border: #e5e7eb;
+
+    /* Neutral ink scale (approved greys) */
+    --ink-900: #1f2937;
+    --ink-800: #262f3d;
+    --ink-700: #374151;
+    --ink-600: #4b5563;
+    --ink-500: #6b7280;
+    --ink-400: #9ca3af;
+    --ink-300: #d1d5db;
+
+    /* Brand scale (teal) */
+    --brand-800: #086063;
+    --brand-700: #0b7c80;
+    --brand-600: #0ea5a8;
+    --brand-500: #0ea5a8;
+    --brand-300: #b7e9ea;
+    --brand-200: #cfeeee;
+    --brand-100: #ddf5f5;
+    --brand-050: #e8f8f8;
+
+    /* Surfaces */
+    --paper: #ffffff;
+    --canvas: #f7fafa;
+    --canvas-2: #e8f8f8;
+    --line: #e5e7eb;
+    --line-strong: #d1d5db;
+    --header: #ffffff;
+
+    /* Semantic */
+    --success-700: #166534;
+    --success-050: #dcfce7;
+    --warning-700: #92400e;
+    --warning-050: #fef3c7;
+    --danger-700: #991b1b;
+    --danger-050: #fee2e2;
+    --info-700: #1d4ed8;
+    --info-050: #eaf0fe;
+    --neutral-700: #4b5563;
+    --neutral-050: #f3f4f6;
+
+    /* Type ----------------------------------------------------------
+       Three system stacks; no downloads, no build step, no CDN (ADR-020):
+       - sans  -> UI, body copy, meta, numerals (unchanged from before)
+       - serif -> editorial display / page / section headings only
+       - mono  -> identifiers (appointment references, slot times) */
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+        Arial, sans-serif;
+    --font-serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino,
+        Georgia, "Times New Roman", "Liberation Serif", serif;
+    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+    /* Back-compatible aliases — same values as before, single source above */
+    --font-display: var(--font-sans);
+    --font-body: var(--font-sans);
+    --font-data: var(--font-mono);
+
+    /* Semantic type roles (Phase 7.5 P1) — font only; sizes stay on the scale
+       below. Serif is scoped to the two display levels (page + section
+       headings); subheads, UI, labels and numerals stay on the sans stack. */
+    --type-display-font: var(--font-serif);  /* hero H1 (display) */
+    --type-page-font: var(--font-serif);     /* h1 — the page heading */
+    --type-section-font: var(--font-serif);  /* h2 — section headings */
+    --type-body-font: var(--font-sans);      /* body copy */
+    --type-support-font: var(--font-sans);   /* supporting text (intros, meta) */
+    --type-data-font: var(--font-data);      /* references, slot times */
+
+    /* Type scale (single source of truth — no font downloads, no build step).
+       Sizes are clamp() so one token works from 390px to 1440px+. */
+    --text-display: clamp(2.35rem, 1rem + 5vw, 5rem);   /* hero H1 — ~80px at 1440 */
+    --text-h2: clamp(1.75rem, 1.2rem + 1.9vw, 2.6rem);  /* section titles */
+    --text-h3: 1.2rem;                                   /* card titles */
+    --text-lead: 1.125rem;                               /* hero / section intros */
+    --text-body: 1rem;
+    --text-small: 0.9rem;                                /* meta, captions */
+    --text-caption: 0.8rem;                              /* eyebrows, labels */
+
+    /* Line heights & tracking */
+    --leading-display: 1.05;   /* the hero H1 sits near 1.0, per the reference */
+    --leading-heading: 1.18;
+    --leading-body: 1.65;
+    --tracking-display: -0.02em;
+    --tracking-heading: -0.015em;
+
+    /* Spacing scale */
+    --sp-1: 0.25rem;
+    --sp-2: 0.5rem;
+    --sp-3: 0.75rem;
+    --sp-4: 1rem;
+    --sp-5: 1.5rem;
+    --sp-6: 2rem;
+    --sp-7: 3rem;
+    --sp-8: 4rem;
+    --sp-9: 6rem;
+
+    /* Radii */
+    --radius-sm: 8px;
+    --radius: 12px;         /* cards, panels, inputs (spec §C.3: 10–14px) */
+    --radius-lg: 18px;
+    --radius-pill: 999px;   /* all buttons + badges (Hospic-style pills) */
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.06);
+    --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.08);
+    --shadow-lg: 0 20px 48px rgba(16, 24, 40, 0.12);
+    /* Resting elevation for content cards — subtle, not a hard drop */
+    --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 16px rgba(16, 24, 40, 0.05);
+    --shadow-card-hover: 0 2px 4px rgba(16, 24, 40, 0.05), 0 14px 30px rgba(16, 24, 40, 0.10);
+
+    /* Layout */
+    --container: 1160px;
+    --measure-heading: 64ch; /* heading wrappers: page/section title + intro */
+    --measure-body: 58ch;    /* intro/lede paragraphs under those headings */
+    --header-h: 4.5rem;
+    --hero-min-h: clamp(620px, 84vh, 840px); /* immersive, ~750–850px on desktop */
+
+    /* Motion (restrained; see docs/animation-reference-analysis.md).
+       Durations are intentionally short — Care_Clinic stays calm. */
+    --motion-fast: 150ms;    /* hover, focus, chips */
+    --motion-base: 220ms;    /* small reveals, mobile nav */
+    --motion-slow: 420ms;    /* section reveals */
+    --motion-hero: 620ms;    /* hero entrance */
+    --motion-stagger: 70ms;  /* per-item delay in a group */
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);   /* UI feedback */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);     /* entrances/reveals */
+    --ease-in-out: cubic-bezier(0.44, 0, 0.56, 1); /* symmetric */
+    --reveal-distance: 16px; /* deliberately far less than the 120px reference */
+    --hover-lift: 3px;
+
+    /* Focus ring */
+    --focus-color: #0b7c80;
+    color-scheme: light;
 }
 
-* { box-sizing: border-box; }
+/* --- Reset & base ------------------------------------------------- */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-padding-top: calc(var(--header-h) + var(--sp-3));
+    -webkit-text-size-adjust: 100%;
+}
 
 body {
     margin: 0;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    color: var(--text);
-    background: var(--surface);
+    font-family: var(--type-body-font);
+    font-size: 1rem;
+    color: var(--ink-900);
+    background: var(--canvas);
     line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
 }
 
+/* Sans base (h3/h4, and any component heading, stay sans); the two display
+   levels — page (h1) and section (h2) — override to the editorial serif. */
+h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    color: var(--ink-900);
+    line-height: var(--leading-heading);
+    margin: 0 0 var(--sp-3);
+    font-weight: 600;
+    letter-spacing: var(--tracking-heading);
+    text-wrap: balance;
+    scroll-margin-top: calc(var(--header-h) + var(--sp-4));
+}
+
+h1 { font-family: var(--type-page-font); font-size: clamp(1.9rem, 1.3rem + 2.4vw, 2.9rem); }
+h2 { font-family: var(--type-section-font); font-size: clamp(1.5rem, 1.15rem + 1.4vw, 2rem); }
+h3 { font-size: var(--text-h3); }
+
+/* Any fragment target (skip-link, in-page anchors) scrolls clear of the
+   sticky header so the focused/anchored element is never obscured. */
+[id] { scroll-margin-top: calc(var(--header-h) + var(--sp-4)); }
+
+p { margin: 0 0 var(--sp-4); }
+
+a {
+    color: var(--brand-700);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+}
+a:hover { color: var(--brand-600); }
+
+img { max-width: 100%; height: auto; }
+
+ul, ol { margin: 0 0 var(--sp-4); }
+
+hr {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: var(--sp-5) 0;
+}
+
+::selection { background: var(--brand-200); color: var(--ink-900); }
+
+a, button, label, select, summary {
+    -webkit-tap-highlight-color: rgba(14, 130, 141, 0.18);
+}
+
+/* --- Layout helpers ----------------------------------------------- */
 .container {
-    width: min(1000px, 92%);
-    margin: 0 auto;
+    width: min(var(--container), 92%);
+    margin-inline: auto;
+}
+.container--narrow { max-width: 720px; }
+.container--form { max-width: 520px; }
+
+main { padding: var(--sp-6) 0 var(--sp-7); }
+
+.section {
+    margin-bottom: var(--sp-7);
+}
+.section:last-child { margin-bottom: 0; }
+
+.section-header {
+    margin-bottom: var(--sp-5);
+    max-width: var(--measure-heading);
+}
+.section-header p { margin: 0; color: var(--ink-500); max-width: var(--measure-body); }
+
+.stack > * + * { margin-top: var(--sp-4); }
+
+.cluster {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    align-items: center;
 }
 
-.site-header {
-    background: var(--navy);
-    color: #fff;
-    padding: 1rem 0;
+.grid { display: grid; gap: var(--sp-4); }
+.grid--two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sp-5); }
+
+/* --- Accessibility helpers ---------------------------------------- */
+.visually-hidden {
+    position: absolute !important;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
 }
 
-.brand {
-    color: #fff;
-    font-weight: 700;
+.skip-link {
+    position: absolute;
+    left: var(--sp-3);
+    top: -100%;
+    z-index: 100;
+    background: var(--paper);
+    color: var(--ink-900);
+    padding: 0.6rem 1rem;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    font-weight: 600;
     text-decoration: none;
-    font-size: 1.25rem;
+    transition: top 0.15s ease;
+}
+.skip-link:focus {
+    top: var(--sp-3);
 }
 
-main { padding: 2.5rem 0; }
-
-.hero h1 { margin: 0 0 .25rem; color: var(--navy); }
-.lead { color: #4a5568; }
-
-.status ul { padding-left: 1.1rem; }
-
-.site-footer {
-    background: var(--navy);
-    color: #cbd5e0;
-    padding: 1rem 0;
-    margin-top: 3rem;
-    font-size: .9rem;
+/* Focus visibility -------------------------------------------------- */
+:focus-visible {
+    outline: 3px solid var(--focus-color);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+    outline: 3px solid var(--focus-color);
+    outline-offset: 2px;
 }
 
-/* --- Header navigation --- */
+/* --- Site header --------------------------------------------------- */
+.site-header {
+    background: var(--paper);
+    color: var(--color-text);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
 .header-inner {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
     flex-wrap: wrap;
+    gap: var(--sp-4);
+    min-height: var(--header-h);
 }
 
-.nav {
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--color-text);
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+.brand:hover { color: var(--brand-700); }
+.brand__mark {
+    display: grid;
+    place-items: center;
+    width: 2.15rem;
+    height: 2.15rem;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--brand-600), var(--brand-700));
+    color: #fff;
+}
+.brand__mark svg { width: 1.15rem; height: 1.15rem; display: block; }
+
+.nav-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    background: var(--paper);
+    border: 1px solid var(--line-strong);
+    color: var(--color-text);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.7rem;
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: border-color var(--motion-fast) var(--ease-standard),
+        color var(--motion-fast) var(--ease-standard);
+}
+.nav-toggle:hover { border-color: var(--brand-600); color: var(--brand-700); }
+.nav-toggle__bars {
+    display: block;
+    width: 1.15rem;
+    height: 2px;
+    background: currentColor;
+    position: relative;
+}
+.nav-toggle__bars::before,
+.nav-toggle__bars::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: currentColor;
+}
+.nav-toggle__bars::before { top: -6px; }
+.nav-toggle__bars::after { top: 6px; }
+
+.site-nav {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    font-size: .95rem;
+    gap: var(--sp-2);
+}
+.site-nav__links {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.site-nav__link {
+    display: inline-block;
+    color: var(--ink-700);
+    text-decoration: none;
+    padding: 0.45rem 0.7rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    font-weight: 500;
+    touch-action: manipulation;
+    transition: background-color var(--motion-fast) var(--ease-standard),
+        color var(--motion-fast) var(--ease-standard);
+}
+.site-nav__link:hover { background: var(--brand-050); color: var(--brand-700); }
+.site-nav__link[aria-current="page"] {
+    background: var(--brand-050);
+    color: var(--brand-700);
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 var(--brand-700);
 }
 
-.nav a,
-.nav .nav-user {
-    color: #e2e8f0;
+.site-nav__account {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding-left: var(--sp-3);
+    margin-left: var(--sp-2);
+    border-left: 1px solid var(--line);
 }
+.site-user {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+}
+.site-user__email { font-weight: 600; color: var(--color-text); }
+.site-user__role { color: var(--brand-700); }
+.site-user__role::before { content: "Role: "; color: var(--color-text-muted); }
+
+/* --- Header single-row guarantee (desktop) --------------------------
+   Authenticated headers (brand + 4-8 nav links + identity + actions)
+   cannot all fit a row with anonymous-only spacing, so the bar derives
+   a compaction ladder: nowrap + shrinkable nav + truncated email, then
+   progressively tighter paddings; below 1180px authenticated headers
+   switch to the drawer (see the dense block further down). Anonymous
+   headers keep the existing generous spacing. */
+@media (min-width: 901px) {
+    .header-inner { flex-wrap: nowrap; }
+    .brand { flex: none; }
+    .site-nav { min-width: 0; flex: 1 1 auto; }
+    .site-nav__links { flex-wrap: nowrap; min-width: 0; }
+    /* Each link/label stays whole (the compaction ladder below, not a
+       mid-label wrap, absorbs the squeeze). */
+    .site-nav__link { white-space: nowrap; }
+    .nav-mega__trigger { display: inline-flex; align-items: center; }
+    .site-nav__account { flex-shrink: 1; min-width: 0; }
+    .site-user { min-width: 0; }
+    .site-user__email {
+        max-width: 14ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .site-nav__account .btn { white-space: nowrap; }
+}
+@media (min-width: 901px) and (max-width: 1359px) {
+    .site-nav__link { padding: 0.45rem 0.55rem; }
+    .site-nav__account { gap: var(--sp-2); padding-left: var(--sp-2); }
+}
+@media (min-width: 901px) and (max-width: 1440px) {
+    .site-user__email { max-width: 12ch; }
+    /* Staff console shortcuts are grouped in the Workspace menu on the
+       desktop bar; inside the drawers the plain links stay flat so the
+       console is reachable at every width. */
+    .site-header--dense .site-user__email { max-width: 10ch; }
+}
+/* Anonymous-only band (authenticated use the drawer here).
+   NB: authenticated headers always carry the dense class, so any rules
+   for them must be dense-scoped instead — the plain .site-user rules
+   here would leak into the authenticated drawer's identity block. */
+@media (min-width: 901px) and (max-width: 1179px) {
+    .site-nav__link { padding: 0.45rem 0.45rem; }
+    .site-user__email { max-width: 10ch; }
+}
+
+/* --- Staff console: Workspace menu ----------------------------------
+   The header row is budget-limited (containers cap near 1086-1160px at
+   every desktop width) and staff headers with the console links inline
+   need ~1298px, so the links painted over the identity block (measured
+   Doctor/Admin overlap at ≥ 1500px). Staff headers therefore group
+   everything authenticated-specific (Dashboard, My appointments, the
+   doctor console, Django admin) into one accessible Workspace menu —
+   the bar keeps the approved anonymous shape plus a single trigger —
+   while patient headers keep their approved top-level links. */
+
+/* --- Specialities mega menu (desktop navbar) ------------------------
+   The trigger is a button (click/keyboard accessible first); desktop
+   pointer hover also opens it via app.js (scoped to a real mouse at
+   ≥901px). The panel is a label region inside the nav LI. Dropdown
+   positioning is anchored to the site header (its containing block), so
+   it follows the sticky (light pages) / absolute+fixed (home) header
+   automatically. */
+.nav-mega { position: static; }
+.nav-mega__trigger {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+}
+.nav-mega__chevron {
+    width: 0.95rem;
+    height: 0.95rem;
+    margin-left: 0.15rem;
+    transition: transform var(--motion-fast) var(--ease-standard);
+}
+.nav-mega__trigger[aria-expanded="true"] .nav-mega__chevron { transform: rotate(180deg); }
+.nav-mega__panel { display: none; }
+/* No JS: plain Specialities link instead of the dropdown — the nav still
+   works everywhere the site works. (Scoped with html.js so the later
+   mobile drawer link rules can't re-show the hidden plain link.) */
+html.js .nav-mega__plain { display: none; }
+html:not(.js) .nav-mega__trigger { display: none; }
+.nav-mega__item { color: var(--color-text); }
+/* Doctors mega menu: monogram avatar instead of a photo tile — no stock
+   photo is ever presented as a specific real doctor (imagery honesty). */
+.nav-mega__avatar { width: 2.6rem; height: 2.6rem; font-size: 0.85rem; }
+.nav-mega__empty { color: var(--ink-600); font-size: 0.95rem; margin: 0.2rem 0; }
+.nav-mega__tile {
+    flex: none;
+    width: 4.6rem;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--brand-050);
+}
+.nav-mega__tile img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
+.nav-mega__text { display: grid; gap: 0.1rem; min-width: 0; }
+.nav-mega__name { color: var(--ink-900); font-weight: 600; font-size: 0.95rem; }
+.nav-mega__desc {
+    color: var(--ink-600);
+    font-size: 0.84rem;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Workspace menu panel: a compact dropdown listing the staff console
+   links (Dashboard / My appointments / Availability / My leave /
+   Django admin). The outer panel gets show/hide, hover bridge and
+   absolute anchoring from the shared .nav-mega__panel rules. */
+.nav-workspace { position: relative; }
+.nav-workspace__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
+.nav-workspace__item {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: var(--radius-sm);
+    color: var(--ink-700);
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background-color var(--motion-fast) var(--ease-standard),
+        color var(--motion-fast) var(--ease-standard);
+}
+.nav-workspace__item:hover { background: var(--brand-050); color: var(--brand-700); }
+.nav-workspace__item:focus-visible { outline: 2px solid var(--brand-700); outline-offset: -2px; }
+.nav-workspace__item[aria-current="page"] {
+    background: var(--brand-050);
+    color: var(--brand-700);
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 var(--brand-700);
+}
+@media (min-width: 1181px) {
+    .js .site-header--dense .nav-workspace .nav-mega__panel.is-open {
+        /* Anchored to the Workspace trigger itself (the LI is the
+           positioning context): left edges aligned, panel opening
+           immediately below the button — never parked near the
+           account actions. */
+        left: 0;
+        right: auto;
+        top: 100%;
+        transform: none;
+        width: min(328px, calc(100vw - 2rem));
+        padding: var(--sp-3);
+    }
+}
+
+@media (min-width: 901px) {
+    /* Center the nav cluster between the brand and the account actions. */
+    .site-nav__links { margin-inline: auto; }
+
+    .js .nav-mega__panel.is-open {
+        display: block;
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 60;
+        width: min(1128px, calc(100vw - 2rem));
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg);
+        padding: var(--sp-6);
+    }
+    /* Invisible hover bridge just above the panel: pointer travel across
+       the small gap between the header edge and the panel still lands
+       inside the menu region, so the JS close-delay never fires
+       mid-traversal (no flicker, no layout shift). */
+    .js .nav-mega__panel.is-open::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: -1rem;
+        height: 1rem;
+    }
+    .nav-mega__grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(230px, 300px);
+        gap: var(--sp-6);
+        align-items: start;
+    }
+    .nav-mega__list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--sp-2) var(--sp-4);
+    }
+    .nav-mega__item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.45rem;
+        border-radius: var(--radius);
+        text-decoration: none;
+        transition: background-color var(--motion-fast) var(--ease-standard);
+    }
+    .nav-mega__item:hover { background: var(--brand-050); }
+    .nav-mega__item:focus-visible { outline: 2px solid var(--brand-700); outline-offset: -2px; }
+    .nav-mega__all { color: var(--brand-700); font-weight: 600; }
+    .nav-mega__all:hover { color: var(--brand-800); }
+    .nav-mega__aside {
+        background: var(--brand-050);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+    .nav-mega__feature { margin: 0; }
+    .nav-mega__feature img { display: block; width: 100%; aspect-ratio: 5 / 4; object-fit: cover; }
+    .nav-mega__feature-body { display: grid; gap: 0.55rem; padding: var(--sp-5); }
+    .nav-mega__feature-title { color: var(--ink-900); font-weight: 700; font-family: var(--font-display); }
+    .nav-mega__feature-text { color: var(--ink-600); font-size: 0.88rem; line-height: 1.45; }
+    .nav-mega__feature-body .btn { justify-self: start; }
+    .nav-mega__foot {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: var(--sp-5);
+        padding-top: var(--sp-4);
+        border-top: 1px solid var(--line);
+    }
+    .nav-mega__all { display: inline-flex; align-items: center; gap: 0.4rem; }
+    .nav-mega__all-arrow { display: grid; place-items: center; width: 1.15rem; height: 1.15rem; border-radius: 50%; background: var(--brand-050); transition: background-color var(--motion-fast) var(--ease-standard); }
+    .nav-mega__all-arrow svg { width: 0.8rem; height: 0.8rem; }
+    .nav-mega__all:hover .nav-mega__all-arrow { background: var(--brand-100); }
+    .nav-mega__all:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; border-radius: 4px; }
+}
+
+/* Homepage scrolled state: the absolute transparent header gains a fixed,
+   restrained translucent dark-navy surface past the hero (no layout jump:
+   both states are out of the normal flow). */
+@media (min-width: 901px) {
+    .js .site-header--hero.is-scrolled {
+        position: fixed;
+        background: rgba(15, 45, 49, 0.9);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+        border-bottom-color: rgba(255, 255, 255, 0.16);
+        box-shadow: 0 6px 24px rgba(9, 34, 37, 0.35);
+    }
+}
+
+/* --- Homepage: transparent header integrated with the hero.
+   Desktop only — on small screens the header stays sticky/opaque so the
+   mobile menu and tap targets keep working exactly as before. */
+@media (min-width: 901px) {
+    .site-header--hero {
+        position: absolute;
+        inset-inline: 0;
+        top: 0;
+        background: transparent;
+        border-bottom-color: rgba(255, 255, 255, 0.2);
+        box-shadow: none;
+        color: #fff;
+    }
+    .site-header--hero .brand { color: #fff; }
+    .site-header--hero .brand:hover { color: var(--brand-050); }
+    .site-header--hero .brand__mark { background: rgba(255, 255, 255, 0.18); }
+    .site-header--hero .site-nav__link { color: rgba(255, 255, 255, 0.92); }
+    .site-header--hero .site-nav__link:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+    .site-header--hero .site-nav__link[aria-current="page"] {
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+        box-shadow: inset 0 -2px 0 var(--brand-050);
+    }
+    .site-header--hero .site-nav__account { border-left-color: rgba(255, 255, 255, 0.3); }
+    .site-header--hero .site-user { color: rgba(255, 255, 255, 0.78); }
+    .site-header--hero .site-user__email { color: #fff; }
+    .site-header--hero .site-user__role { color: var(--brand-300); }
+    .site-header--hero .site-user__role::before { color: rgba(255, 255, 255, 0.7); }
+    .site-header--hero .link-button { color: #fff; }
+    .site-header--hero .link-button:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+    .site-header--hero .btn--primary { background: #fff; color: var(--brand-700); }
+    .site-header--hero .btn--primary:hover { background: var(--brand-050); color: var(--brand-800); }
+    .site-header--hero .btn--secondary {
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.55);
+    }
+    .site-header--hero .btn--secondary:hover { background: rgba(255, 255, 255, 0.22); color: #fff; }
+    .site-header--hero :focus-visible { outline-color: var(--brand-050); }
+}
+
+/* --- Buttons ------------------------------------------------------- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    min-height: 2.875rem;
+    padding: 0.6rem 1.4rem;
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.2;
+    cursor: pointer;
+    text-decoration: none;
+    text-align: center;
+    transition: background-color var(--motion-fast) var(--ease-standard),
+        border-color var(--motion-fast) var(--ease-standard),
+        color var(--motion-fast) var(--ease-standard),
+        box-shadow var(--motion-fast) var(--ease-standard);
+    touch-action: manipulation;
+}
+.btn:disabled,
+.btn[aria-disabled="true"] {
+    background: var(--line);
+    border-color: var(--line);
+    color: var(--ink-500);
+    opacity: 1;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.btn--primary { background: var(--brand-700); color: #fff; }
+.btn--primary:hover { background: var(--brand-800); color: #fff; }
+.btn--primary:active { background: var(--brand-800); }
+
+.btn--secondary {
+    background: var(--paper);
+    color: var(--ink-800);
+    border-color: var(--line-strong);
+}
+.btn--secondary:hover { background: var(--canvas-2); color: var(--ink-900); }
+
+.btn--danger { background: var(--danger-700); color: #fff; }
+.btn--danger:hover { background: #7f150e; color: #fff; }
+
+.btn--ghost {
+    background: transparent;
+    color: var(--brand-700);
+    border-color: transparent;
+    padding-inline: 0.6rem;
+}
+.btn--ghost:hover { background: var(--brand-050); color: var(--brand-700); }
+
+.btn--sm { min-height: 2.125rem; padding: 0.35rem 0.9rem; font-size: 0.85rem; }
+.btn--lg { min-height: 3.125rem; padding: 0.66rem 1.5rem; font-size: 1.05rem; }
+.btn--block { width: 100%; }
+
+/* Circular arrow disc on primary CTAs (Hospic-style). The arrow keeps the
+   Phase 7.2 hover/focus nudge; the disc supplies the round treatment. */
+.btn__disc {
+    display: grid;
+    place-items: center;
+    width: 1.6em;
+    height: 1.6em;
+    margin-right: -0.5em;
+    flex: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.btn--inverse .btn__disc { background: var(--brand-050); }
+.btn--arrow:hover .btn__disc,
+.btn--arrow:focus-visible .btn__disc { background: rgba(255, 255, 255, 0.32); }
+.btn--inverse.btn--arrow:hover .btn__disc,
+.btn--inverse.btn--arrow:focus-visible .btn__disc { background: var(--brand-100); }
 
 .inline-form { display: inline; margin: 0; }
 
+/* Inline text button (header + elsewhere) */
 .link-button {
     background: none;
     border: 0;
-    color: #e2e8f0;
+    color: var(--color-text);
     font: inherit;
+    font-size: 0.95rem;
     cursor: pointer;
-    padding: 0;
-    text-decoration: underline;
+    padding: 0.45rem 0.7rem;
+    border-radius: var(--radius-sm);
 }
+.link-button:hover { background: var(--brand-050); color: var(--brand-700); }
 
-/* --- Flash messages --- */
-.messages {
+/* --- Cards (shared partials: partials/_speciality_card.html, _doctor_card.html) */
+ul.grid {
     list-style: none;
-    padding: 0;
-    margin: 1rem 0;
-}
-
-.message {
-    padding: .6rem .9rem;
-    border-radius: 6px;
-    border: 1px solid transparent;
-}
-
-.message.success { background: #e6fffa; border-color: #38b2ac; color: #234e52; }
-.message.error { background: #fff5f5; border-color: #e53e3e; color: #742a2a; }
-.message.warning { background: #fffaf0; border-color: #dd6b20; color: #7b341e; }
-
-/* --- Auth panels & forms --- */
-.auth-panel {
-    max-width: 460px;
-    margin: 1rem auto;
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 1.75rem;
-}
-
-.auth-panel h1 { margin-top: 0; color: var(--navy); }
-.muted { color: #718096; font-size: .92rem; }
-
-.auth-panel form p { margin: 0 0 1rem; }
-
-.auth-panel label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: .25rem;
-}
-
-.auth-panel input[type="text"],
-.auth-panel input[type="email"],
-.auth-panel input[type="password"] {
-    width: 100%;
-    padding: .55rem .7rem;
-    border: 1px solid #cbd5e0;
-    border-radius: 6px;
-    font: inherit;
-}
-
-.auth-panel input:focus {
-    outline: 2px solid var(--teal);
-    outline-offset: 1px;
-    border-color: var(--teal);
-}
-
-.helptext { display: block; color: #718096; font-size: .82rem; margin-top: .2rem; }
-
-.errorlist {
-    list-style: none;
-    padding: .5rem .75rem;
-    margin: 0 0 1rem;
-    background: #fff5f5;
-    border: 1px solid #e53e3e;
-    border-radius: 6px;
-    color: #742a2a;
-    font-size: .9rem;
-}
-
-.btn {
-    display: inline-block;
-    border: 0;
-    border-radius: 6px;
-    padding: .6rem 1.1rem;
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.btn-primary { background: var(--teal); color: #fff; }
-.btn-primary:hover { background: #0b5c5f; }
-
-.auth-links { margin-top: 1.25rem; font-size: .92rem; }
-
-/* --- Catalog: cards, tables, filter bar (Phase 4) --- */
-section { margin-bottom: 2rem; }
-
-.card-grid {
-    list-style: none;
-    padding: 0;
     margin: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 1rem;
+    padding: 0;
 }
 
-.card {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 1rem 1.1rem;
-}
-
-.card-title {
-    display: block;
-    font-weight: 700;
-    color: var(--navy);
-    text-decoration: none;
-    margin-bottom: .35rem;
-}
-
-.card-title:hover { color: var(--teal); }
-
-.btn-secondary {
-    background: #edf2f7;
-    color: var(--navy);
-    text-decoration: none;
-}
-.btn-secondary:hover { background: #e2e8f0; }
-
-.filter-bar {
+/* =====================================================================
+   Hero (home)
+   ===================================================================== */
+.hero {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: .75rem;
+    min-height: var(--hero-min-h);
+    color: #fff;
+    padding: clamp(4.5rem, 9vw, 8rem) 0;
+    /* Solid teal only as a loading fallback — the full-bleed photograph
+       (.hero__bg) is the hero's background (imagery batch 1, revision 2). */
+    background-color: #07595c;
+    overflow: hidden;
+}
+/* Readability overlay above the photograph: a vertical top band keeps the
+   transparent desktop navigation legible, the horizontal gradient darkens
+   the copy side and lets the photo stay clearly visible on the right. */
+.hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background-image:
+        linear-gradient(180deg, rgba(5, 54, 56, 0.62) 0%, rgba(5, 54, 56, 0) 22%),
+        linear-gradient(97deg,
+            rgba(4, 48, 50, 0.9) 0%,
+            rgba(5, 60, 62, 0.74) 48%,
+            rgba(7, 85, 88, 0.42) 78%,
+            rgba(5, 66, 68, 0.6) 100%);
+    pointer-events: none;
+}
+.hero > :not(.hero__bg) { position: relative; z-index: 2; }
+.hero > .container { width: min(var(--container), 92%); }
+.hero__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: clamp(2rem, 5vw, 4rem);
+    align-items: center;
+}
+.hero h1 {
+    font-family: var(--type-display-font);
+    color: #fff;
+    font-size: var(--text-display);
+    line-height: var(--leading-display);
+    margin-bottom: var(--sp-4);
+    letter-spacing: var(--tracking-display);
+}
+.hero__lead {
+    color: rgba(255, 255, 255, 0.92);
+    font-size: var(--text-lead);
+    max-width: 42ch;
+    margin-bottom: var(--sp-6);
+}
+.hero__actions {
+    display: flex;
     flex-wrap: wrap;
-    margin: 1rem 0 1.5rem;
+    gap: var(--sp-3);
+}
+.hero .btn--secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.6);
+}
+.hero .btn--secondary:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.hero :focus-visible { outline-color: #e8f8f8; }
+
+/* Full-bleed hero photograph (imagery batch 1, revision 2). The licensed
+   scene fills the hero edge to edge — behind the transparent desktop
+   navigation — instead of sitting in a rounded card. Decorative for AT:
+   the section's own copy carries the meaning. object-fit cover + explicit
+   positioning keep both subjects in frame at every width; the absolute
+   background layer cannot shift layout. */
+.hero__bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 32%;
+    pointer-events: none;
 }
 
-.filter-bar label { font-weight: 600; }
-
-.filter-bar select {
-    padding: .5rem .6rem;
-    border: 1px solid #cbd5e0;
-    border-radius: 6px;
+.hero__panel {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: var(--sp-6);
+    box-shadow: var(--shadow-lg);
+    color: var(--color-text);
+}
+.hero__panel h2 {
+    color: var(--color-text);
+    font-size: 1.2rem;
+    margin-bottom: var(--sp-1);
+}
+.hero__panel p { color: var(--color-text-muted); font-size: 0.92rem; }
+.hero__panel label { color: var(--color-text); }
+.hero__panel select {
+    width: 100%;
+    padding: 0.65rem 0.75rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line-strong);
+    background: var(--paper);
+    color: var(--color-text);
     font: inherit;
-    background: #fff;
 }
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: var(--sp-4);
+}
+.hero-badge svg { width: 1rem; height: 1rem; }
 
-.breadcrumb { font-size: .9rem; color: #718096; }
-.breadcrumb a { color: var(--teal); }
+/* --- How it works (genuine sequence -> numbers justified) ---------- */
+.steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--sp-5);
+    counter-reset: step;
+}
+.step { position: relative; padding-left: 3rem; }
+.step::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: -0.15rem;
+    width: 2.1rem;
+    height: 2.1rem;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-pill);
+    background: var(--brand-050);
+    color: var(--brand-700);
+    border: 1px solid var(--brand-200);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+.step h3 { margin-bottom: var(--sp-1); font-size: 1.05rem; }
+.step p { margin: 0; color: var(--ink-500); font-size: 0.95rem; }
 
+/* --- Page header / breadcrumb -------------------------------------- */
+.page-head { margin-bottom: var(--sp-6); max-width: var(--measure-heading); }
+.page-head .section-rule { margin-bottom: var(--sp-4); }
+.page-head p { color: var(--ink-500); margin-bottom: 0; max-width: var(--measure-body); }
+
+.breadcrumb {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0;
+    margin: 0 0 var(--sp-3);
+    font-size: 0.88rem;
+    color: var(--ink-500);
+}
+.breadcrumb li + li::before { content: "/"; color: var(--ink-300); margin-right: 0.4rem; }
+.breadcrumb a { color: var(--brand-700); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+
+/* --- Definition lists --------------------------------------------- */
 .detail-list {
     display: grid;
-    grid-template-columns: max-content 1fr;
-    gap: .25rem 1rem;
-    margin: 1rem 0 1.5rem;
+    grid-template-columns: minmax(8rem, max-content) 1fr;
+    gap: var(--sp-2) var(--sp-4);
+    margin: 0 0 var(--sp-5);
 }
-.detail-list dt { font-weight: 600; color: #4a5568; }
+.detail-list dt {
+    font-weight: 600;
+    color: var(--ink-500);
+    font-size: 0.9rem;
+}
 .detail-list dd { margin: 0; }
+
+/* --- Pills / tags -------------------------------------------------- */
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.7rem;
+    line-height: 1.5;
+    border-radius: var(--radius-pill);
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--brand-050);
+    color: var(--brand-700);
+    border: 1px solid var(--brand-200);
+}
+.pill--neutral {
+    background: var(--canvas-2);
+    color: var(--ink-600);
+    border-color: var(--line);
+}
+
+/* =====================================================================
+   Status badges (text + dot, never colour alone)
+   ===================================================================== */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.28rem 0.7rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.5;
+    background: var(--neutral-050);
+    color: var(--neutral-700);
+    white-space: nowrap;
+}
+.badge__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+.status-requested { background: var(--warning-050); color: var(--warning-700); }
+.status-confirmed { background: var(--brand-100); color: var(--brand-700); }
+.status-checked_in { background: var(--info-050); color: var(--info-700); }
+.status-completed { background: var(--success-050); color: var(--success-700); }
+.status-cancelled { background: var(--danger-050); color: var(--danger-700); }
+.status-no_show { background: var(--neutral-050); color: var(--neutral-700); }
+
+/* =====================================================================
+   Alerts / messages
+   ===================================================================== */
+.messages { list-style: none; padding: 0; margin: 0 0 var(--sp-5); }
+.message {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line-strong);
+    background: var(--paper);
+    margin-bottom: var(--sp-3);
+    color: var(--ink-800);
+}
+.message:last-child { margin-bottom: 0; }
+.message__icon { flex: none; font-weight: 700; }
+.message__label { font-weight: 700; }
+.message.success { background: var(--success-050); border-color: #b7e2cd; color: var(--success-700); }
+.message.error { background: var(--danger-050); border-color: #f3c2bd; color: var(--danger-700); }
+.message.warning { background: var(--warning-050); border-color: #f0d9ac; color: var(--warning-700); }
+.message.info { background: var(--info-050); border-color: #c3d2fb; color: var(--info-700); }
+
+/* =====================================================================
+   Forms
+   ===================================================================== */
+.form { margin: 0; }
+fieldset { border: 0; margin: 0; padding: 0; }
+.field { margin-bottom: var(--sp-4); }
+.field:last-child { margin-bottom: 0; }
+
+.field__label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: var(--sp-1);
+    color: var(--ink-800);
+    font-size: 0.95rem;
+}
+.field__req { color: var(--danger-700); margin-left: 0.15rem; }
+.field__help {
+    display: block;
+    color: var(--ink-500);
+    font-size: 0.82rem;
+    margin: 0.25rem 0 0;
+    line-height: 1.4;
+}
+.field__help ul { margin: 0.25rem 0 0; padding-left: 1.1rem; }
+.field__error {
+    display: block;
+    color: var(--danger-700);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0.3rem 0 0;
+}
+.field--error input,
+.field--error select,
+.field--error textarea {
+    border-color: var(--danger-700);
+    background: #fffafa;
+}
+.field--error .field__label { color: var(--danger-700); }
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="date"],
+input[type="time"],
+input[type="number"],
+input[type="search"],
+input[type="url"],
+select,
+textarea {
+    width: 100%;
+    padding: 0.62rem 0.75rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    font: inherit;
+    font-size: 0.95rem;
+    color: var(--ink-900);
+    background: var(--paper);
+    transition: border-color var(--motion-fast) var(--ease-standard),
+        box-shadow var(--motion-fast) var(--ease-standard);
+}
+textarea { min-height: 7rem; resize: vertical; }
+input::placeholder, textarea::placeholder { color: var(--ink-400); }
+input:focus, select:focus, textarea:focus {
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px rgba(14, 130, 141, 0.18);
+    outline: none;
+}
+input:disabled, select:disabled, textarea:disabled {
+    background: var(--canvas-2);
+    color: var(--ink-400);
+    cursor: not-allowed;
+}
+
+/* Native validation feedback implemented in CSS (no silent JS) */
+.form-alerts { margin-bottom: var(--sp-5); }
+
+.form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    align-items: center;
+    margin-top: var(--sp-5);
+}
+
+/* --- Auth: split editorial panel (F3: login / register) ------------ */
+/* Left: licensed illustrative photograph behind a deep-teal scrim with a
+   short editorial line. Right: the form card. The simple auth pages
+   (password reset, logged out) keep the single centred `.auth-panel`. */
+.auth-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: var(--sp-6);
+    align-items: stretch;
+    margin: var(--sp-5) 0 var(--sp-8);
+}
+
+.auth-visual {
+    position: relative;
+    min-height: 34rem;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--shadow-md);
+    isolation: isolate;
+}
+.auth-visual__media { position: absolute; inset: 0; margin: 0; }
+.auth-visual__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 32%;
+}
+.auth-visual__scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        180deg,
+        rgba(8, 96, 99, 0) 32%,
+        rgba(8, 96, 99, 0.55) 68%,
+        rgba(8, 96, 99, 0.86) 100%
+    );
+}
+.auth-visual__content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: var(--sp-6);
+    color: #fff;
+}
+.auth-visual__content .eyebrow { color: var(--brand-200); }
+.auth-visual__quote {
+    font-family: var(--type-page-font);
+    font-size: clamp(1.25rem, 1rem + 1vw, 1.65rem);
+    line-height: 1.3;
+    margin: 0;
+    max-width: 32ch;
+    text-wrap: balance;
+}
+.auth-visual__caption {
+    margin: var(--sp-2) 0 0;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.auth-card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: clamp(1.75rem, 1.1rem + 2.2vw, 3rem);
+}
+.auth-card .section-rule { margin-bottom: var(--sp-3); }
+.auth-card h1 { margin-bottom: var(--sp-2); }
+.auth-card .form { margin-top: var(--sp-5); }
+
+/* --- Auth: single centred panel (reset flow, logged out) ------------ */
+.auth-panel {
+    max-width: 480px;
+    margin: var(--sp-6) auto;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--sp-7) var(--sp-6);
+}
+.auth-panel .section-rule { margin-bottom: var(--sp-3); }
+.auth-panel h1 { margin-bottom: var(--sp-2); }
+.auth-panel .form { margin-top: var(--sp-5); }
+.auth-links {
+    margin-top: var(--sp-5);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--line);
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-4);
+}
+/* Block-level actions under an auth card (not an inline-link row). */
+.auth-actions { margin-top: var(--sp-5); }
+
+.muted { font-family: var(--type-support-font); color: var(--ink-500); font-size: 0.92rem; }
+
+/* =====================================================================
+   Tables (responsive: horizontal scroll + optional stacked mode)
+   ===================================================================== */
+.table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--paper);
+    box-shadow: var(--shadow-sm);
+    -webkit-overflow-scrolling: touch;
+}
+.table-wrap:focus-visible { outline: 3px solid var(--focus-color); outline-offset: 2px; }
 
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    overflow: hidden;
+    min-width: 44rem;
 }
-
+.data-table caption {
+    text-align: left;
+    padding: var(--sp-3) var(--sp-4);
+    font-weight: 600;
+    color: var(--ink-700);
+    border-bottom: 1px solid var(--line);
+}
 .data-table th,
 .data-table td {
     text-align: left;
-    padding: .6rem .8rem;
-    border-bottom: 1px solid #edf2f7;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
 }
-
 .data-table thead th {
-    background: #f7fafc;
-    color: var(--navy);
-    font-size: .9rem;
-}
-
-.data-table tr:last-child td { border-bottom: 0; }
-
-.row-actions { display: flex; gap: .75rem; }
-.row-actions a { color: var(--teal); }
-.row-actions a.danger { color: #c53030; }
-
-/* --- Appointments (Phase 5) --- */
-.status-badge {
-    display: inline-block;
-    padding: .18rem .55rem;
-    border-radius: 999px;
-    font-size: .78rem;
+    background: var(--canvas-2);
+    color: var(--ink-700);
+    font-size: 0.82rem;
     font-weight: 700;
-    letter-spacing: .02em;
-    background: #edf2f7;
-    color: var(--navy);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
 }
-.status-requested { background: #fef3c7; color: #92400e; }
-.status-confirmed { background: #dbeafe; color: #1e40af; }
-.status-checked_in { background: #e0e7ff; color: #3730a3; }
-.status-completed { background: #d1fae5; color: #065f46; }
-.status-cancelled { background: #fee2e2; color: #991b1b; }
-.status-no_show { background: #f3f4f6; color: #374151; }
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.data-table tbody tr:hover { background: var(--brand-050); }
+.data-table td.num { font-variant-numeric: tabular-nums; }
+.data-table .cell-ref {
+    font-family: var(--type-data-font);
+    font-size: 0.85rem;
+    color: var(--ink-800);
+}
 
+.row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1) var(--sp-3);
+    align-items: center;
+}
+.row-actions form { margin: 0; }
+.row-actions .btn { min-height: 2rem; padding: 0.3rem 0.7rem; font-size: 0.82rem; }
+
+/* Stacked presentation on small screens (no JS) */
+@media (max-width: 640px) {
+    .table-wrap--stack .data-table { min-width: 0; }
+    .table-wrap--stack .data-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .table-wrap--stack .data-table,
+    .table-wrap--stack .data-table tbody,
+    .table-wrap--stack .data-table tr,
+    .table-wrap--stack .data-table td {
+        display: block;
+        width: 100%;
+    }
+    .table-wrap--stack .data-table tr {
+        border-bottom: 1px solid var(--line);
+        padding: var(--sp-3) var(--sp-4);
+    }
+    .table-wrap--stack .data-table tr:last-child { border-bottom: 0; }
+    .table-wrap--stack .data-table td {
+        border: 0;
+        padding: 0.3rem 0;
+        display: flex;
+        gap: var(--sp-3);
+        justify-content: space-between;
+        align-items: baseline;
+    }
+    .table-wrap--stack .data-table td::before {
+        content: attr(data-label);
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--ink-500);
+        flex: none;
+        min-width: 6.5rem;
+    }
+    .table-wrap--stack .data-table td .row-actions { justify-content: flex-end; }
+}
+
+/* =====================================================================
+   Filter bar & filter form
+   ===================================================================== */
+.filters {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-5);
+    margin: 0 0 var(--sp-5);
+    box-shadow: var(--shadow-sm);
+}
+.filters__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--sp-4);
+    align-items: end;
+}
+.filters .field { margin-bottom: 0; }
+.filters__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    align-items: center;
+    margin-top: var(--sp-4);
+}
+.filters legend,
+.filters__title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--ink-800);
+    margin-bottom: var(--sp-3);
+}
+
+/* Simple inline filter (public doctor list) */
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--sp-4);
+    margin: 0 0 var(--sp-6);
+    padding: var(--sp-4) 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+}
+.filter-bar .field { margin-bottom: 0; min-width: 14rem; }
+
+/* =====================================================================
+   Dashboard scaffolding
+   ===================================================================== */
+.dashboard { display: block; }
+.dashboard__head { margin-bottom: var(--sp-5); }
+.dashboard__head h1 { margin-bottom: var(--sp-1); }
+.dashboard__head p { margin: 0; color: var(--ink-500); }
+
+.stat-grid {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--sp-5);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--sp-4);
+}
+.stat-card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--brand-500);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-5);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+}
+.stat-value {
+    font-family: var(--font-display);
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--ink-900);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--ink-500);
+    font-weight: 600;
+}
+
+/* --- Pagination ---------------------------------------------------- */
+.pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-4);
+    margin: var(--sp-5) 0 0;
+}
+.pagination__status { color: var(--ink-500); font-size: 0.9rem; }
+
+/* =====================================================================
+   Appointments
+   ===================================================================== */
 .date-nav {
     list-style: none;
     display: flex;
     flex-wrap: wrap;
-    gap: .5rem;
+    gap: var(--sp-2);
     padding: 0;
-    margin: 0 0 1.5rem;
+    margin: 0 0 var(--sp-5);
 }
 .date-chip {
-    display: inline-block;
-    padding: .4rem .7rem;
-    border: 1px solid #cbd5e0;
-    border-radius: 8px;
-    background: #fff;
-    color: var(--navy);
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    padding: 0.5rem 0.85rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--paper);
+    color: var(--ink-800);
     text-decoration: none;
-    font-size: .9rem;
+    font-size: 0.9rem;
+    line-height: 1.2;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
 }
-.date-chip.is-active { background: var(--teal); color: #fff; border-color: var(--teal); }
+.date-chip__dow { font-size: 0.72rem; color: var(--ink-500); font-weight: 600; }
+.date-chip:hover { border-color: var(--brand-500); color: var(--ink-900); }
+.date-chip.is-active {
+    background: var(--brand-600);
+    color: #fff;
+    border-color: var(--brand-600);
+}
+.date-chip.is-active .date-chip__dow { color: var(--brand-200); }
 
 .slot-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: .6rem;
-    margin: .5rem 0 1.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--sp-3);
+    margin: var(--sp-2) 0 var(--sp-5);
+    padding: 0;
+    list-style: none;
 }
 .slot-option {
     display: flex;
     align-items: center;
-    gap: .4rem;
-    padding: .55rem .7rem;
-    border: 1px solid #cbd5e0;
-    border-radius: 8px;
-    background: #fff;
+    gap: 0.55rem;
+    min-height: 2.75rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
     cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
-.slot-option:has(input:checked) { border-color: var(--teal); box-shadow: 0 0 0 2px rgba(13,115,119,.15); }
-
-.booking-form textarea {
-    width: 100%;
-    padding: .5rem .65rem;
-    border: 1px solid #cbd5e0;
-    border-radius: 6px;
-    font: inherit;
+.slot-option:hover { border-color: var(--brand-500); }
+.slot-option input { width: auto; margin: 0; accent-color: var(--brand-600); }
+.slot-option:has(input:checked) {
+    border-color: var(--brand-600);
+    background: var(--brand-050);
+    box-shadow: 0 0 0 2px var(--brand-200);
 }
+.slot-option:focus-within { outline: 3px solid var(--focus-color); outline-offset: 2px; }
+.slot-time { font-weight: 600; font-variant-numeric: tabular-nums; }
 
-.btn-danger { background: #c53030; color: #fff; }
-.btn-danger:hover { background: #9b2c2c; }
-
-/* --- Dashboards (Phase 6) --- */
-.stat-grid {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 1.5rem;
+/* --- Appointment ticket motif (detail / confirmation) -------------- */
+.ticket {
+    position: relative;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: .75rem;
+    grid-template-columns: 1fr auto;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
 }
-.stat-card {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: .9rem 1rem;
+.ticket::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 6px;
+    background: var(--brand-600);
+}
+.ticket__main { padding: var(--sp-5) var(--sp-6); }
+.ticket__label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--ink-500);
+    margin: 0 0 var(--sp-2);
+}
+.ticket__ref {
+    font-family: var(--type-data-font);
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--ink-900);
+    margin: 0 0 var(--sp-4);
+    letter-spacing: 0.02em;
+}
+.ticket__stub {
+    padding: var(--sp-5) var(--sp-6);
+    background: var(--brand-050);
+    border-left: 2px dashed var(--brand-200);
     display: flex;
     flex-direction: column;
-    gap: .15rem;
+    justify-content: center;
+    gap: var(--sp-1);
+    min-width: 12rem;
 }
-.stat-value { font-size: 1.6rem; font-weight: 700; color: var(--navy); }
-.stat-label { font-size: .82rem; color: #718096; text-transform: uppercase; letter-spacing: .03em; }
+.ticket__date { font-family: var(--font-display); font-size: 1.2rem; color: var(--ink-900); font-weight: 600; }
+.ticket__time { font-size: 0.95rem; color: var(--ink-700); font-variant-numeric: tabular-nums; }
+.ticket__status { margin-top: var(--sp-2); }
 
-.filter-form {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 1rem 1.1rem;
-    margin: 1rem 0 1.5rem;
+/* =====================================================================
+   Empty states
+   ===================================================================== */
+.empty {
+    text-align: center;
+    padding: var(--sp-7) var(--sp-5);
+    background: var(--paper);
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    color: var(--ink-500);
 }
-.filter-form p { margin: 0 0 .75rem; }
-.filter-form label { display: block; font-weight: 600; margin-bottom: .2rem; }
-.filter-form input[type="text"],
-.filter-form input[type="date"],
-.filter-form select {
+.empty__mark {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    margin: 0 auto var(--sp-3);
+    border-radius: var(--radius-pill);
+    background: var(--canvas-2);
+    color: var(--ink-600);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.4rem;
+}
+.empty h2, .empty h3 { color: var(--ink-800); font-size: 1.15rem; }
+.empty p { margin-bottom: var(--sp-4); }
+.empty--inline { padding: var(--sp-5); }
+
+/* =====================================================================
+   Misc pages (403/404/500, no-dashboard, confirmations)
+   ===================================================================== */
+.notice {
+    max-width: 640px;
+    margin: var(--sp-6) auto;
+    text-align: center;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--sp-7) var(--sp-6);
+    box-shadow: var(--shadow-sm);
+}
+.notice h1 { font-size: 1.6rem; }
+.notice p { color: var(--ink-500); }
+
+.confirm {
+    max-width: 560px;
+    margin: var(--sp-5) auto;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-top: 5px solid var(--danger-700);
+    border-radius: var(--radius);
+    padding: var(--sp-6);
+    box-shadow: var(--shadow-sm);
+}
+
+/* --- Footer --------------------------------------------------------
+   Hospic-inspired editorial footer (deep slate-navy surface, four
+   organised columns, oversized cropped brand wordmark). Care_Clinic's
+   teal stays as the accent (logo mark, hovers, focus outlines). The
+   watermark is decorative: aria-hidden, no pointer events, no user
+   selection, and it is clipped by the footer's own edge (overflow
+   hidden) so it can never create horizontal overflow. */
+.site-footer {
+    position: relative;
+    overflow: hidden;
+    background: #0f2d31; /* deep slate-navy; teal accents above */
+    color: #c9dde0;
+    padding: var(--sp-8) 0 clamp(6rem, 11vw, 10rem);
+    font-size: 0.92rem;
+    /* No top margin: the gap below the CTA/light page content comes from
+       main's own padding; no extra spacer is needed here. */
+}
+.site-footer__inner {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1.35fr 0.9fr 0.9fr 1.2fr;
+    gap: var(--sp-6) var(--sp-6);
+}
+.site-footer__brand {
+    font-family: var(--font-display);
+    color: #fff;
+    font-size: 1.3rem;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.site-footer__brand:hover { color: #fff; }
+.site-footer__brand .brand__mark { width: 1.9rem; height: 1.9rem; border-radius: 9px; background: var(--brand-600); }
+.site-footer__brand .brand__mark svg { width: 1rem; height: 1rem; }
+.site-footer__tagline {
+    margin: var(--sp-3) 0 0;
+    max-width: 34ch;
+    color: #c9dde0;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+.site-footer__heading {
+    color: #fff;
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    margin: 0 0 var(--sp-3);
+}
+.site-footer__col ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--sp-2);
+}
+.site-footer__col a {
+    display: inline-block;
+    padding: 0.15rem 0;
+    min-height: 1.6rem;
+}
+.site-footer a { color: #ffffff; text-decoration: none; }
+.site-footer a:hover { color: var(--brand-300); text-decoration: underline; }
+.site-footer a:focus-visible { outline: 2px solid var(--brand-300); outline-offset: 2px; }
+.site-footer__bottom {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--sp-2) var(--sp-3);
+    margin-top: var(--sp-7);
+    padding-top: var(--sp-4);
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    font-size: 0.85rem;
+    color: #c9dde0;
+}
+.site-footer__bottom p { margin: 0; }
+/* Oversized, low-opacity brand wordmark along the bottom edge, partially
+   cropped by the footer boundary (reference-style editorial signature). */
+.site-footer__mark {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    z-index: 0;
+    transform: translate(-50%, 0.32em);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(4.5rem, 15.5vw, 15rem);
+    line-height: 0.8;
+    letter-spacing: -0.03em;
+    color: #fff;
+    opacity: 0.07;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* =====================================================================
+   Homepage sections
+   ===================================================================== */
+.main--flush { padding-top: 0; padding-bottom: 0; }
+
+.band { padding: clamp(3.75rem, 7vw, 6.5rem) 0; }
+.band--tint { background: var(--color-primary-soft); }
+.band--compact { padding-block: clamp(2rem, 3.5vw, 3rem); }
+/* Muted grey is kept AA on the light-teal tint by darkening it one step. */
+.band--tint .section-intro { color: var(--ink-600); }
+
+/* Structural lead-in — a short teal rule above a section label. A layout
+   device from print/journal grammar, not a decorative flourish. */
+.section-rule {
+    display: block;
+    width: 40px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--brand-600);
+    margin-bottom: var(--sp-3);
+}
+
+/* Editorial label — sentence case, quiet weight, brand teal. Deliberately not
+   the tracked-out ALL-CAPS eyebrow default: it names the section without
+   competing with the serif heading beneath it. */
+.eyebrow {
+    display: block;
+    font-family: var(--type-support-font);
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--brand-700);
+    margin: 0 0 var(--sp-2);
+}
+.section-title {
+    font-family: var(--type-section-font);
+    font-size: var(--text-h2);
+    line-height: var(--leading-heading);
+    margin: 0 0 var(--sp-3);
+    letter-spacing: var(--tracking-heading);
+}
+.section-intro {
+    font-family: var(--type-support-font);
+    color: var(--color-text-muted);
+    max-width: 58ch;
+    font-size: var(--text-lead);
+    margin: 0;
+}
+.band__head { max-width: var(--measure-heading); margin-bottom: var(--sp-7); }
+.band__more { margin: var(--sp-7) 0 0; }
+
+/* At-a-glance strip (genuine counts only) */
+.trust-strip {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-5) var(--sp-8);
+    align-items: center;
+}
+.trust-item { display: flex; flex-direction: column; gap: 0.15rem; }
+.trust-item + .trust-item {
+    padding-left: var(--sp-6);
+    border-left: 1px solid var(--brand-200);
+}
+.trust-value {
+    font-size: clamp(1.9rem, 1.5rem + 1.4vw, 2.6rem);
+    font-weight: 700;
+    color: var(--brand-700);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.trust-label { color: var(--color-text-muted); font-weight: 600; font-size: 0.92rem; }
+
+/* About — editorial split: copy left, licensed-atmosphere photo right
+   (imagery batch 1). The photo is decorative reinforcement; the copy and
+   real-data claims live in the text and the honest figure caption. */
+.about-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: clamp(2rem, 5vw, 4rem);
+    align-items: center;
+}
+.about-copy { max-width: var(--measure-heading); }
+.about-copy p { color: var(--ink-700); }
+/* Figure plate — an editorial "figure" with an honest caption. Flat brand
+   ground (no gradient wash), one decorative aria-hidden motif, real caption
+   text. Not a photograph and not dimensional: depth stays in the hero only. */
+.figure-plate { margin: 0; }
+.figure-plate__frame {
+    position: relative;
+    aspect-ratio: 5 / 4;
+    border-radius: var(--radius);
+    background: var(--brand-700);
+    overflow: hidden;
+}
+.figure-plate__frame svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* Photograph variant: fills the same plate geometry; object-fit covers any
+   aspect drift, and the frame's aspect-ratio reserves space (no CLS). */
+.figure-plate__frame img {
+    position: absolute;
+    inset: 0;
     width: 100%;
-    padding: .5rem .6rem;
-    border: 1px solid #cbd5e0;
-    border-radius: 6px;
-    font: inherit;
-    background: #fff;
+    height: 100%;
+    object-fit: cover;
 }
-.filter-actions { display: flex; gap: .75rem; align-items: center; }
+.figure-plate__caption {
+    margin-top: var(--sp-3);
+    font-family: var(--type-support-font);
+    font-size: var(--text-small);
+    color: var(--color-text-muted);
+    max-width: var(--measure-body);
+}
+/* Large, photo-ready variant used by the homepage's dedicated visual band.
+   The image-led moment of the band: a deep-teal plate carrying a big white
+   planner card — flat and two-dimensional, no gradients, no extra layers. */
+.figure-plate--lg .figure-plate__frame {
+    aspect-ratio: 3 / 2;
+    background: var(--brand-700);
+    border: 1px solid var(--brand-800);
+}
+.figure-plate--lg .figure-plate__caption { margin-top: var(--sp-4); }
+.about-steps {
+    list-style: none;
+    margin: var(--sp-6) 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0;
+    counter-reset: aboutstep;
+}
+.about-steps li {
+    position: relative;
+    padding: var(--sp-4) 0 var(--sp-4) 2.75rem;
+    border-top: 1px solid var(--line);
+    color: var(--ink-600);
+}
+.about-steps li:first-child { border-top: 0; padding-top: 0; }
+.about-steps li::before {
+    counter-increment: aboutstep;
+    content: counter(aboutstep, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: var(--sp-4);
+    font-family: var(--type-support-font);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--brand-700);
+}
+.about-steps li:first-child::before { top: 0; }
+.about-steps strong { display: block; color: var(--color-text); }
 
-.pagination { display: flex; align-items: center; gap: 1rem; margin: 1.25rem 0; }
-.pagination-status { color: #718096; font-size: .9rem; }
+/* Dedicated visual band (home) — the page's one image-led moment. A flat
+   two-dimensional plate; the hero keeps the single dimensional layer. */
+.viz-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: center;
+}
+.viz-rail { max-width: var(--measure-heading); }
 
-.action-link { color: var(--teal); }
+/* Services / specialities — editorial index entries */
+.service-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--sp-6) var(--sp-7);
+}
+.service-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    height: 100%;
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--line);
+    transition: border-color var(--motion-base) var(--ease-out);
+}
+/* Optional per-speciality photograph (static/img/specialities/<slug>-card.jpg).
+   Licensed atmosphere imagery — decorative (aria-hidden wrapper, empty alt):
+   it never claims to depict the clinic's own premises, staff or doctors. */
+.service-card__media {
+    position: relative;
+    aspect-ratio: 3 / 2;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    overflow: hidden;
+}
+.service-card__media img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.service-card:hover,
+.service-card:focus-within {
+    border-top-color: var(--brand-600);
+}
+.service-card__title { font-size: var(--text-h3); font-weight: 700; margin: 0; }
+.service-card__title a {
+    color: var(--color-text);
+    text-decoration: none;
+    text-underline-offset: 0.15em;
+}
+.service-card:hover .service-card__title a,
+.service-card:focus-within .service-card__title a {
+    color: var(--brand-700);
+    text-decoration: underline;
+}
+.service-card__text { color: var(--color-text-muted); margin: 0; font-size: 0.95rem; }
+.service-card__link {
+    margin-top: auto;
+    padding-top: var(--sp-3);
+    font-weight: 600;
+    color: var(--brand-700);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.service-card__link svg { width: 1rem; height: 1rem; }
+.service-card__link:hover,
+.service-card__link:focus-visible,
+.doctor-card__link:hover,
+.doctor-card__link:focus-visible { text-decoration: underline; }
 
-section > h2 { color: var(--navy); }
+/* Doctors */
+.doctor-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--sp-6) var(--sp-7);
+}
+.doctor-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    height: 100%;
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--line);
+    transition: border-color var(--motion-base) var(--ease-out);
+}
+.doctor-card:hover,
+.doctor-card:focus-within {
+    border-top-color: var(--brand-600);
+}
+.doctor-card__head { display: flex; align-items: center; gap: var(--sp-3); }
+.avatar {
+    flex: none;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-sm);
+    display: grid;
+    place-items: center;
+    background: var(--paper);
+    border: 1px solid var(--brand-200);
+    color: var(--brand-700);
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+}
+.doctor-card__name { font-size: 1.1rem; font-weight: 700; margin: 0; }
+.doctor-card__name a {
+    color: var(--color-text);
+    text-decoration: none;
+    text-underline-offset: 0.15em;
+}
+.doctor-card:hover .doctor-card__name a,
+.doctor-card:focus-within .doctor-card__name a {
+    color: var(--brand-700);
+    text-decoration: underline;
+}
+.doctor-card__qual { color: var(--ink-600); font-size: 0.88rem; margin: 0.1rem 0 0; }
+.doctor-card__meta {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+    color: var(--ink-600);
+}
+.doctor-card__meta li { display: flex; gap: 0.4rem; }
+.doctor-card__link {
+    align-self: flex-start;
+    margin-top: auto;
+    padding-top: var(--sp-3);
+    font-weight: 600;
+    color: var(--brand-700);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.doctor-card__link svg { width: 1rem; height: 1rem; }
 
+/* Doctor portraits — slug-mapped local stock placeholders that stand in
+   for doctor photographs (img/doctors/<slug>-profile.webp; replace with
+   clinic-supplied, consented portraits when available). The photo fills
+   the existing initials-avatar geometry (object-fit: cover, stable box,
+   no CLS); the initials avatar stays as the graceful fallback when a
+   file is missing. Decorative: the adjacent name carries the meaning. */
+.avatar--photo { overflow: hidden; }
+.avatar--photo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+}
+/* Portrait crops want a slightly rounder treatment than the initials tile. */
+.avatar--photo { border-radius: var(--radius); }
+.avatar--photo.avatar--xl { border-radius: var(--radius-lg); }
+
+/* =====================================================================
+   Public catalog pages (F2) — image-led page hero, refined doctor
+   cards, doctor profile masthead. Reuses the homepage design language:
+   hairline rule + eyebrow + serif display, flat rounded photo plates,
+   no gradients beyond the approved tokens.
+   ===================================================================== */
+.eyebrow {
+    font-family: var(--type-support-font);
+    font-size: var(--text-caption);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-600);
+    margin: 0 0 var(--sp-2);
+}
+
+/* Editorial page hero — text-first composition; optional rounded
+   photograph plate (atmosphere imagery with alt=""). The frame reserves
+   its box with aspect-ratio so layout does not shift while loading. */
+.page-hero { padding-block: clamp(2.25rem, 5vw, 4rem); }
+.page-hero__grid {
+    display: grid;
+    gap: clamp(2rem, 5vw, 4rem);
+    align-items: center;
+}
+.page-hero--media .page-hero__grid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+}
+.page-hero__copy { max-width: var(--measure-heading); min-width: 0; }
+.page-hero .breadcrumb { margin: 0 0 var(--sp-4); }
+.page-hero--media .breadcrumb { margin-bottom: var(--sp-3); }
+.page-hero .section-rule { display: block; }
+.page-hero .section-rule + .eyebrow { margin-top: var(--sp-4); }
+.page-hero h1 {
+    font-size: clamp(2.1rem, 1.5rem + 1.9vw, 3.2rem);
+    margin: 0 0 var(--sp-3);
+}
+.page-hero__lede {
+    color: var(--ink-700);
+    font-size: 1.05rem;
+    max-width: var(--measure-body);
+    margin: 0;
+}
+.page-hero__count {
+    font-family: var(--type-support-font);
+    color: var(--ink-600);
+    font-size: 0.95rem;
+    margin: var(--sp-4) 0 0;
+}
+.page-hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-top: var(--sp-6);
+}
+.page-hero__media { margin: 0; min-width: 0; }
+.page-hero__frame { aspect-ratio: 3 / 2; }
+.page-hero__frame.figure-plate__frame--54 { aspect-ratio: 5 / 4; }
+.page-hero__media .figure-plate__caption { max-width: none; }
+
+/* Band variant: compact band that must sit tight under the previous one. */
+.band--flush-top { padding-top: 0; }
+
+/* Doctor card refinements — clearer speciality labelling, real
+   consultation fee when published, fixed-height alignment and a real
+   booking action next to the profile link. */
+.doctor-card__spec {
+    color: var(--brand-600);
+    font-family: var(--type-support-font);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0.15rem 0 0;
+}
+.doctor-card__meta { margin-bottom: var(--sp-4); }
+.doctor-card__meta li { align-items: center; }
+.doctor-card__meta-open::before {
+    content: "";
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--brand-600);
+}
+.doctor-card__actions {
+    margin-top: auto;
+    padding-top: var(--sp-2);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+}
+.doctor-card__link { align-self: center; margin-top: 0; padding-top: 0; }
+
+/* Doctor detail — profile masthead: initials avatar (never a stock
+   portrait), identity cluster, real facts list, booking CTA; the aside
+   keeps the real availability table plus an explicitly labelled
+   illustrative photograph. */
+.profile-head { padding-block: clamp(2.25rem, 5vw, 3.75rem); }
+.profile-head__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    gap: clamp(2rem, 5vw, 4rem);
+    align-items: start;
+}
+.profile-head__main { min-width: 0; }
+.profile-head__main .breadcrumb { margin: 0 0 var(--sp-4); }
+.profile-head__id {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    margin-top: var(--sp-5);
+}
+.avatar--xl {
+    width: 5.25rem;
+    height: 5.25rem;
+    font-size: 1.6rem;
+    border-radius: var(--radius-lg);
+}
+.profile-head__name {
+    font-size: clamp(2rem, 1.5rem + 1.7vw, 3rem);
+    margin: 0 0 var(--sp-2);
+}
+.profile-head__pills { margin: 0; }
+.profile-head__facts { margin: var(--sp-6) 0 0; max-width: 34rem; }
+.profile-head__side { min-width: 0; }
+.profile-head__side h2 { margin: 0 0 var(--sp-4); }
+.profile-side-plate { margin-top: var(--sp-6); }
+.profile-bio { max-width: var(--measure-heading); }
+.profile-bio .section-rule { display: block; margin-bottom: var(--sp-4); }
+.profile-bio h2 { margin: 0 0 var(--sp-3); }
+.profile-bio__text {
+    color: var(--ink-700);
+    margin: 0;
+    white-space: pre-line;
+}
+
+/* Closing CTA band */
+.cta-band {
+    position: relative;
+    background: var(--brand-800);
+    color: #fff;
+    overflow: hidden;
+}
+.cta-band__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-6);
+}
+.cta-band h2 {
+    color: #fff;
+    margin: 0 0 var(--sp-2);
+    font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.1rem);
+}
+.cta-band p { color: #e8f8f8; margin: 0; max-width: 52ch; }
+.cta-band .btn--secondary {
+    background: transparent;
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.6);
+}
+.cta-band .btn--secondary:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.cta-band :focus-visible { outline-color: #e8f8f8; }
+.btn--inverse { background: #fff; color: var(--brand-700); }
+.btn--inverse:hover { background: var(--brand-050); color: var(--brand-800); }
+
+.band--tint .empty { background: var(--paper); }
+
+/* =====================================================================
+   Spacing utilities (token-backed; last so they win on equal
+   specificity). Used to remove one-off inline margin styles.
+   ===================================================================== */
+.mb-0 { margin-bottom: 0; }
+.mb-3 { margin-bottom: var(--sp-3); }
+.mb-4 { margin-bottom: var(--sp-4); }
+.mb-5 { margin-bottom: var(--sp-5); }
+.mt-6 { margin-top: var(--sp-6); }
+
+/* =====================================================================
+   Motion & animation (restrained; all of it is decorative).
+   Scoped to `.js` so the page is complete and static without JavaScript.
+   `prefers-reduced-motion: reduce` removes it (see the block further down).
+   ===================================================================== */
+
+/* Hero overlay — soft fade-in (the end state must be fully opaque so the
+   readability overlay over the photograph lands at full strength). */
+.js .hero::before {
+    animation: hero-bg var(--motion-hero) var(--ease-out) both;
+}
+@keyframes hero-bg {
+    from { opacity: 0; transform: scale(1.04); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Hero heading + supporting text — staggered fade-up */
+.js .hero__copy > * {
+    animation: hero-rise var(--motion-hero) var(--ease-out) both;
+}
+.js .hero__copy > :nth-child(2) { animation-delay: var(--motion-stagger); }
+.js .hero__copy > :nth-child(3) { animation-delay: calc(var(--motion-stagger) * 2); }
+.js .hero__copy > :nth-child(4) { animation-delay: calc(var(--motion-stagger) * 3); }
+.js .hero__panel {
+    animation: hero-rise var(--motion-hero) var(--ease-out) both;
+    animation-delay: calc(var(--motion-stagger) * 2);
+}
+@keyframes hero-rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* One-shot section reveals (JavaScript adds `.is-visible` once, via
+   IntersectionObserver, then stops observing — it never replays). */
+.js .reveal {
+    opacity: 0;
+    transform: translateY(var(--reveal-distance));
+    transition: opacity var(--motion-slow) var(--ease-out),
+        transform var(--motion-slow) var(--ease-out);
+}
+.js .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+}
+
+/* CTA arrow nudge on hover and keyboard focus */
+.btn__arrow {
+    width: 1.05em;
+    height: 1.05em;
+    flex: none;
+    transition: transform var(--motion-fast) var(--ease-standard);
+}
+.btn__disc .btn__arrow { width: 1em; height: 1em; }
+.btn--arrow:hover .btn__arrow,
+.btn--arrow:focus-visible .btn__arrow {
+    transform: translateX(3px);
+}
+
+/* Mobile navigation open/close (used inside the <=900px block below) */
+@keyframes nav-open {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes nav-close {
+    from { opacity: 1; transform: none; }
+    to   { opacity: 0; transform: translateY(-6px); }
+}
+
+/* =====================================================================
+   Responsive
+   ===================================================================== */
+@media (max-width: 900px) {
+    .hero__grid { grid-template-columns: 1fr; gap: var(--sp-5); }
+    /* Compact but substantial mobile/tablet composition: the full-bleed
+       photograph keeps real vertical presence (not a collapsed strip) and a
+       steadier overlay keeps copy and actions readable across the whole
+       narrower image. */
+    .hero {
+        min-height: min(82vh, 700px);
+        padding: clamp(3.25rem, 9vw, 4.5rem) 0;
+    }
+    .hero::before {
+        background-image:
+            linear-gradient(180deg,
+                rgba(4, 48, 50, 0.85) 0%,
+                rgba(4, 48, 50, 0.8) 42%,
+                rgba(6, 64, 66, 0.38) 60%,
+                rgba(6, 64, 66, 0.3) 100%);
+    }
+    .about-grid { grid-template-columns: 1fr; gap: var(--sp-6); }
+    .viz-grid { grid-template-columns: 1fr; gap: var(--sp-6); }
+    .figure-plate--lg .figure-plate__frame { aspect-ratio: 16 / 9; }
+    /* F2 page heroes and the doctor masthead stack: copy first, photo
+       plate second (DOM order already matches). */
+    .page-hero--media .page-hero__grid { grid-template-columns: 1fr; gap: var(--sp-6); }
+    .profile-head__grid { grid-template-columns: 1fr; gap: var(--sp-6); }
+    .avatar--xl { width: 4.5rem; height: 4.5rem; font-size: 1.4rem; }
+    /* F3 auth split stacks: photo band on top, form card below. */
+    .auth-split { grid-template-columns: 1fr; gap: var(--sp-5); align-items: stretch; }
+    .auth-visual { min-height: 0; aspect-ratio: 16 / 10; }
+    .auth-visual__content { padding: var(--sp-5); }
+    .auth-visual__quote { max-width: none; }
+    .auth-card { padding: var(--sp-6) var(--sp-5); }
+}
+
+/* Collapsed navigation on small screens.
+   - Without JS the panel is always visible (usable, just taller).
+   - With JS the toggle collapses it; .is-open shows it again. */
+@media (max-width: 900px) {
+    .site-nav {
+        display: none;
+        flex-basis: 100%;
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        background: var(--paper);
+        border-top: 1px solid var(--line);
+        padding: var(--sp-3) 0 var(--sp-4);
+        margin-top: var(--sp-2);
+    }
+    .js .nav-toggle { display: inline-flex; align-items: center; }
+    .js .site-nav.is-open {
+        display: flex;
+        animation: nav-open var(--motion-base) var(--ease-out) both;
+    }
+    .js .site-nav.is-closing {
+        display: flex;
+        animation: nav-close var(--motion-base) var(--ease-out) both;
+    }
+    html:not(.js) .site-nav { display: flex; }
+    .site-nav__links {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.1rem;
+        width: 100%;
+    }
+    .site-nav__link {
+        display: flex;
+        align-items: center;
+        min-height: 2.75rem;
+        padding: 0.7rem 0.6rem;
+        font-size: 1rem;
+    }
+    .site-nav__account {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--sp-3);
+        margin: var(--sp-3) 0 0;
+        padding: var(--sp-4) 0 0;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+        width: 100%;
+    }
+    .site-nav__account .btn,
+    .site-nav__account .link-button { width: 100%; min-height: 2.75rem; }
+    .site-nav__account .link-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .site-user { margin-bottom: var(--sp-1); }
+}
+
+/* Mobile drawer: Specialities becomes a stacked expandable section */
+@media (max-width: 900px) {
+    .nav-mega { width: 100%; }
+    .nav-mega__trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+    }
+    .js .nav-mega__panel.is-open,
+    html:not(.js) .nav-mega__panel {
+        display: block;
+        position: static;
+        transform: none;
+        width: 100%;
+        padding: 0.25rem 0.4rem 0.4rem 0.75rem;
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+    .nav-mega__list { grid-template-columns: 1fr; gap: 0.1rem; }
+    .js .nav-mega__item,
+    html:not(.js) .nav-mega__item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.55rem 0.6rem;
+        min-height: 2.9rem;
+        border-radius: var(--radius-sm);
+    }
+    .js .nav-mega__item:hover { background: var(--brand-050); }
+    .nav-mega__tile { width: 3.9rem; }
+    .nav-mega__avatar { width: 2.9rem; height: 2.9rem; font-size: 0.9rem; }
+    .js .nav-mega__aside, html:not(.js) .nav-mega__aside { display: none; }
+    .js .nav-mega__foot, html:not(.js) .nav-mega__foot {
+        display: block;
+        margin: var(--sp-2) 0 0;
+        padding: var(--sp-2) 0.6rem 0;
+        border-top: 1px solid var(--line);
+    }
+    .nav-mega__all { display: inline-flex; align-items: center; gap: 0.4rem; }
+}
+
+/* Dense header drawer (901-1180px, authenticated only) ---------------
+   Authenticated headers (up to 8 nav links + identity + two actions)
+   cannot fit one row on a small laptop, so below 1180px they fall back
+   to the same drawer pattern as mobile. Anonymous headers keep the
+   desktop bar (they fit everywhere). The rules mirror the mobile block
+   above — keep the two in sync. */
+@media (min-width: 901px) and (max-width: 1180px) {
+    .site-header--dense .header-inner { flex-wrap: wrap; }
+    .site-header--dense .site-nav {
+        display: none;
+        flex-basis: 100%;
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        background: var(--paper);
+        border-top: 1px solid var(--line);
+        padding: var(--sp-3) 0 var(--sp-4);
+        margin-top: var(--sp-2);
+    }
+    .js .site-header--dense .nav-toggle { display: inline-flex; align-items: center; }
+    .js .site-header--dense .site-nav.is-open {
+        display: flex;
+        animation: nav-open var(--motion-base) var(--ease-out) both;
+    }
+    .js .site-header--dense .site-nav.is-closing {
+        display: flex;
+        animation: nav-close var(--motion-base) var(--ease-out) both;
+    }
+    html:not(.js) .site-header--dense .site-nav { display: flex; }
+    .site-header--dense .site-nav__links {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.1rem;
+        width: 100%;
+    }
+    .site-header--dense .site-nav__link {
+        display: flex;
+        align-items: center;
+        min-height: 2.75rem;
+        padding: 0.7rem 0.6rem;
+        font-size: 1rem;
+    }
+    .site-header--dense .site-nav__account {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--sp-3);
+        margin: var(--sp-3) 0 0;
+        padding: var(--sp-4) 0 0;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+        width: 100%;
+    }
+    .site-header--dense .site-nav__account .btn,
+    .site-header--dense .site-nav__account .link-button { width: 100%; min-height: 2.75rem; }
+    .site-header--dense .site-nav__account .link-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .site-header--dense .site-user { margin-bottom: var(--sp-1); }
+    /* Drawer shows the full identity (the bar truncates it instead). */
+    .site-header--dense .site-user__email { max-width: none; overflow: visible; text-overflow: clip; white-space: normal; }
+    /* Homepage hero header: the drawer surface is white, so it must
+       never inherit the transparent desktop header's white text (the
+       hero colour rules above are scoped >= 901px and land exactly in
+       this band for authenticated home visitors). Scoped to the dense
+       header so the anonymous bar (links shown over the hero photo)
+       keeps its approved white-on-photo treatment. Same specificity
+       class-count, later in the file -> the drawer wins. */
+    .site-header--hero.site-header--dense .site-nav__link { color: var(--ink-700); }
+    .site-header--hero.site-header--dense .site-nav__link:hover { background: var(--brand-050); color: var(--brand-700); }
+    .site-header--hero.site-header--dense .site-nav__link[aria-current="page"] {
+        background: var(--brand-050);
+        color: var(--brand-700);
+        box-shadow: inset 0 -2px 0 var(--brand-700);
+    }
+    .site-header--hero.site-header--dense .site-user { color: var(--color-text-muted); }
+    .site-header--hero.site-header--dense .site-user__email { color: var(--color-text); }
+    .site-header--hero.site-header--dense .site-user__role { color: var(--brand-700); }
+    .site-header--hero.site-header--dense .site-user__role::before { color: var(--color-text-muted); }
+    .site-header--hero.site-header--dense .link-button { color: var(--ink-700); }
+    /* Log out (btn--secondary) keeps the standard drawer button look. */
+    .site-header--hero.site-header--dense .btn--secondary {
+        background: var(--paper);
+        color: var(--ink-800);
+        border-color: var(--line-strong);
+    }
+    .site-header--hero.site-header--dense .btn--secondary:hover { background: var(--canvas-2); color: var(--ink-900); }
+
+    .site-header--dense .nav-mega { width: 100%; }
+    .site-header--dense .nav-mega__trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+    }
+    .js .site-header--dense .nav-mega__panel.is-open,
+    html:not(.js) .site-header--dense .nav-mega__panel {
+        display: block;
+        position: static;
+        transform: none;
+        width: 100%;
+        padding: 0.25rem 0.4rem 0.4rem 0.75rem;
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+    .site-header--dense .nav-mega__list { grid-template-columns: 1fr; gap: 0.1rem; }
+    .js .site-header--dense .nav-mega__item,
+    html:not(.js) .site-header--dense .nav-mega__item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.55rem 0.6rem;
+        min-height: 2.9rem;
+        border-radius: var(--radius-sm);
+    }
+    .js .site-header--dense .nav-mega__item:hover { background: var(--brand-050); }
+    .site-header--dense .nav-mega__tile { width: 3.9rem; }
+    .site-header--dense .nav-mega__avatar { width: 2.9rem; height: 2.9rem; font-size: 0.9rem; }
+    .js .site-header--dense .nav-mega__aside,
+    html:not(.js) .site-header--dense .nav-mega__aside { display: none; }
+    .js .site-header--dense .nav-mega__foot,
+    html:not(.js) .site-header--dense .nav-mega__foot {
+        display: block;
+        margin: var(--sp-2) 0 0;
+        padding: var(--sp-2) 0.6rem 0;
+        border-top: 1px solid var(--line);
+    }
+    .site-header--dense .nav-mega__all { display: inline-flex; align-items: center; gap: 0.4rem; }
+}
+
+@media (max-width: 760px) {
+    .site-footer__inner { grid-template-columns: 1fr; gap: var(--sp-5); }
+    .site-footer { padding-bottom: clamp(5rem, 22vw, 8rem); }
+    .cta-band__inner { flex-direction: column; align-items: flex-start; }
+}
+
+/* Tablet: two balanced columns; the brand block spans the full width. */
+@media (max-width: 1180px) and (min-width: 761px) {
+    .site-footer__inner { grid-template-columns: 1fr 1fr; gap: var(--sp-6); }
+    .site-footer__brandcol { grid-column: 1 / -1; }
+}
+
+@media (max-width: 640px) {
+    main { padding: var(--sp-5) 0 var(--sp-6); }
+    .detail-list { grid-template-columns: 1fr; gap: 0.15rem; }
+    .detail-list dt { margin-top: var(--sp-2); }
+    .ticket { grid-template-columns: 1fr; }
+    .ticket__stub { border-left: 0; border-top: 2px dashed var(--brand-200); }
+    .auth-panel { padding: var(--sp-5); }
+    .auth-visual { aspect-ratio: auto; height: 15rem; }
+    .auth-visual__content { padding: var(--sp-4); }
+    .filters { padding: var(--sp-4); }
+    .stat-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+    .figure-plate--lg .figure-plate__frame { aspect-ratio: 4 / 3; }
+    .profile-head__id { flex-wrap: wrap; }
+    .page-hero__frame { aspect-ratio: 3 / 2; }
+    :root { --header-h: 3.9rem; }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0.001ms !important;
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+    }
+    .skip-link { transition: none; }
+    /* Decorative motion is removed entirely: show the final state at once. */
+    .js .reveal { opacity: 1 !important; transform: none !important; }
+    .js .hero::before,
+    .js .hero__copy > *,
+    .js .hero__panel { animation: none !important; }
+    .btn--arrow:hover .btn__arrow,
+    .btn--arrow:focus-visible .btn__arrow { transform: none; }
+}
+
+/* Print: keep it clean for appointment slips */
+@media print {
+    .site-header, .site-footer, .skip-link, .btn, .row-actions { display: none !important; }
+    body { background: #fff; }
+    .ticket { box-shadow: none; }
+}
+
+/* =====================================================================
+   F4 — booking & clinic workflow components
+   ===================================================================== */
+
+/* Doctor strip on the booking / reschedule pages: the selected doctor
+   is the page's first-class context (correct per-slug portrait, initials
+   avatar when a slug has no file). One row, wraps under its own rules. */
+.booking-doctor {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-5);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    margin: 0 0 var(--sp-6);
+}
+.booking-doctor .avatar { width: 3.5rem; height: 3.5rem; border-radius: var(--radius); }
+.booking-doctor__body { min-width: 0; margin-right: auto; }
+.booking-doctor__name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 0.15rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.booking-doctor__meta { color: var(--ink-600); font-size: 0.9rem; margin: 0; }
+.booking-doctor__meta strong { color: var(--ink-800); font-weight: 600; font-family: var(--type-data-font); letter-spacing: 0.02em; }
+.booking-doctor__link {
+    flex: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--brand-700);
+    text-decoration: none;
+    text-underline-offset: 0.15em;
+}
+.booking-doctor__link:hover, .booking-doctor__link:focus-visible { text-decoration: underline; }
+
+/* Summary strip above the confirm action (booking, reschedule,
+   receptionist). Works without JS; the live time line is upgraded by
+   app.js when a radio is chosen. */
+.booking-summary {
+    padding: var(--sp-4) var(--sp-5);
+    border: 1px solid var(--brand-200);
+    border-left: 6px solid var(--brand-600);
+    border-radius: var(--radius);
+    background: var(--paper);
+    margin: 0 0 var(--sp-5);
+}
+.booking-summary__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brand-700);
+    margin: 0 0 var(--sp-2);
+}
+.booking-summary ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.3rem;
+}
+.booking-summary li {
+    display: flex;
+    gap: 0.35rem 1rem;
+    flex-wrap: wrap;
+    align-items: baseline;
+    font-size: 0.95rem;
+}
+.booking-summary li span {
+    flex: none;
+    width: 5.5rem;
+    color: var(--ink-500);
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+.booking-summary li strong { font-weight: 600; color: var(--ink-900); }
+
+/* Slot options: selected vs not must read at a glance; the native radio
+   stays focusable and screen-reader-visible. */
+.slot-option { min-height: 3rem; }
+.slot-option .slot-time { font-size: 0.95rem; }
+
+/* Cancellation: compact summary of exactly what is being cancelled. */
+.cancel-summary {
+    list-style: none;
+    margin: var(--sp-4) 0;
+    padding: var(--sp-4) var(--sp-5);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--canvas-2);
+    display: grid;
+    gap: var(--sp-3);
+}
+.cancel-summary div { display: flex; gap: 1rem; align-items: baseline; flex-wrap: wrap; }
+.cancel-summary dt {
+    flex: none;
+    width: 6.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink-500);
+}
+.cancel-summary dd { margin: 0; font-weight: 600; color: var(--ink-900); }
+
+/* Destructive-confirmation explainer (cancellation consequences). */
+.confirm-note { margin: var(--sp-4) 0; }
+.confirm-note p {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--radius);
+    border: 1px dashed var(--danger-200, var(--line));
+    background: var(--canvas-2);
+    color: var(--ink-600);
+    font-size: 0.92rem;
+}
+
+/* Availability / leave tables: human-readable footnotes + day cell. */
+.table-footnote {
+    color: var(--ink-500);
+    font-size: 0.85rem;
+    margin: var(--sp-3) 0 0;
+}
+.day-cell { font-weight: 600; }
+
+/* Ticket: the doctor identity row replaces the plain Doctor line. */
+.ticket__person {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0 0 var(--sp-4);
+}
+.ticket__person .avatar { width: 3.25rem; height: 3.25rem; }
+.ticket__person__body { min-width: 0; }
+.ticket__person__name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 0.15rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.ticket__person__meta { color: var(--ink-600); font-size: 0.9rem; margin: 0; }
+
+/* Form controls that were left native (select/time/checkbox) now share
+   the editorial control look used by text inputs. */
+.form select,
+.form input[type="time"],
+.form input[type="date"] {
+    font: inherit;
+    color: var(--ink-900);
+    padding: 0.55rem 0.7rem;
+}
+.form input[type="checkbox"] {
+    width: 1.05rem;
+    height: 1.05rem;
+    accent-color: var(--brand-600);
+    margin: 0;
+}
+.field--checkbox, .field .field--checkbox { }
+.form .field:has(> input[type="checkbox"]), .filters .field:has(> input[type="checkbox"]) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .booking-doctor { flex-wrap: wrap; padding: var(--sp-4); }
+    .booking-doctor__link { width: 100%; }
+    .booking-summary { padding: var(--sp-4); }
+    .booking-summary li span { width: auto; }
+    .booking-summary li { display: block; }
+    .booking-summary li strong { display: block; }
+    .cancel-summary { padding: var(--sp-4); }
+    .cancel-summary dt { width: auto; }
+    .cancel-summary dd { flex: 1 1 auto; }
+}
+
+
+/* =====================================================================
+   Phase F5 — dashboard polish (appended; existing rules untouched)
+   ===================================================================== */
+.dashboard__head .section-rule { display: block; margin-bottom: var(--sp-2); }
+.dashboard__head .eyebrow { margin-bottom: var(--sp-2); }
+.dashboard__head p { max-width: var(--measure-body); }
+
+.dashboard__identity {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+}
+.dashboard__avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--color-primary-soft, var(--brand-050));
+    color: var(--color-primary-dark, var(--brand-700));
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+.dashboard__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+}
+
+.stat-grid.dashboard__counts { grid-template-columns: repeat(auto-fit, minmax(200px, 260px)); }
+
+.empty--inline h2 { margin-bottom: var(--sp-2); }
+.empty--inline .btn { margin-bottom: 0; }
+
+@media (max-width: 768px) {
+    .dashboard__identity { gap: var(--sp-2); }
+    .dashboard__avatar { width: 44px; height: 44px; }
+    .stat-grid.dashboard__counts { grid-template-columns: 1fr 1fr; display: grid; gap: var(--sp-3); }
+}

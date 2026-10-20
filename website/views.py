@@ -17,6 +17,8 @@ class HomeView(TemplateView):
         context = super().get_context_data(**kwargs)
         context["specialities"] = Speciality.objects.active()[:6]
         context["doctors"] = Doctor.objects.public()[:6]
+        context["speciality_count"] = Speciality.objects.active().count()
+        context["doctor_count"] = Doctor.objects.public().count()
         return context
 
 

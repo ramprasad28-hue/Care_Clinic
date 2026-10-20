@@ -34,7 +34,8 @@ class AppointmentFilterForm(forms.Form):
         required=False, widget=forms.DateInput(attrs={"type": "date"})
     )
     status = forms.ChoiceField(
-        required=False, choices=AppointmentStatus.choices
+        required=False,
+        choices=[("", "All statuses")] + list(AppointmentStatus.choices),
     )
     doctor = forms.ModelChoiceField(
         required=False,

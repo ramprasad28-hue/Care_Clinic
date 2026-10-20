@@ -3,30 +3,43 @@
 {% block title %}My leave — Care_Clinic{% endblock %}
 
 {% block content %}
-<h1>My leave</h1>
-<p class="muted">Date ranges during which you are unavailable.</p>
+<div class="container">
+    <div class="page-head">
+        <span class="section-rule" aria-hidden="true"></span>
+        <h1>My leave</h1>
+        <p>Date ranges during which you are unavailable.</p>
+    </div>
 
-<p><a class="btn btn-primary" href="{% url 'clinic:leave_add' %}">Add leave</a></p>
+    <p><a class="btn btn--primary" href="{% url 'clinic:leave_add' %}">Add leave</a></p>
 
-{% if leaves %}
-    <table class="data-table">
-        <thead>
-            <tr><th>Start</th><th>End</th><th>Reason</th><th>Actions</th></tr>
-        </thead>
-        <tbody>
-            {% for leave in leaves %}
-                <tr>
-                    <td>{{ leave.start_date|date:"Y-m-d" }}</td>
-                    <td>{{ leave.end_date|date:"Y-m-d" }}</td>
-                    <td>{{ leave.reason|default:"—" }}</td>
-                    <td class="row-actions">
-                        <a class="danger" href="{% url 'clinic:leave_delete' leave.pk %}">Delete</a>
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <p class="muted">You have no leave recorded.</p>
-{% endif %}
+    {% if leaves %}
+        <div class="table-wrap table-wrap--stack" tabindex="0" role="region" aria-label="Leave periods">
+            <table class="data-table">
+                <thead>
+                    <tr><th scope="col">Start</th><th scope="col">End</th><th scope="col">Reason</th><th scope="col">Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for leave in leaves %}
+                        <tr>
+                            <td data-label="Start" class="num">{{ leave.start_date|date:"Y-m-d" }}</td>
+                            <td data-label="End" class="num">{{ leave.end_date|date:"Y-m-d" }}</td>
+                            <td data-label="Reason">{{ leave.reason|default:"—" }}</td>
+                            <td data-label="Actions">
+                                <div class="row-actions">
+                                    <a class="btn btn--ghost btn--sm" href="{% url 'clinic:leave_delete' leave.pk %}">Delete</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty">
+            <h2>No leave recorded</h2>
+            <p>When you are on leave, add the dates here so no slots are offered during that period.</p>
+            <p><a class="btn btn--primary" href="{% url 'clinic:leave_add' %}">Add your first leave</a></p>
+        </div>
+    {% endif %}
+</div>
 {% endblock %}

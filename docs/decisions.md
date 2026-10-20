@@ -198,6 +198,89 @@ scoping; dashboards stay presentational and cheap to test. `LOGIN_REDIRECT_URL` 
 link. Book-on-behalf validates the submitted patient/doctor id through `ModelChoiceField`s
 before calling the service, so a forged id cannot be used.
 
+## ADR-020 — Hand-built CSS design system; no frontend framework or build step (Phase 7)
+
+**Context:** Phase 7 replaces the early placeholder styling with a professional healthcare
+UI. ADR-001/architecture §8 mentioned "Bootstrap 5", but inspection in Phase 7 showed that no
+Bootstrap CSS/JS was ever actually loaded — the app shipped a small hand-written
+`static/css/styles.css`. The brief requires preserving the working Django backend and avoiding
+heavy frontend dependencies.
+**Decision:** Keep the server-rendered, dependency-free approach and build an original design
+system in plain CSS driven by custom properties (tokens): colour, typography, spacing, radii,
+shadows, focus ring, and breakpoints. Layout uses CSS grid/flexbox; responsiveness and the
+mobile navigation are CSS-first (no JS required). A single optional `static/js/app.js` provides
+progressive enhancement only (mobile-menu toggle, filter auto-submit, confirm dialogs,
+double-submit guard, focus-first-error) and the site remains fully usable with JavaScript
+disabled. No SPA, no CSS framework, no build tooling, no external font/asset/CDN requests.
+**Consequences:** Zero new runtime dependencies and no build step; full control over
+accessibility (skip link, landmarks, `:focus-visible`, `prefers-reduced-motion`, status
+carried by text + shape, not colour) and mobile behaviour (360–1440 px, stacked tables/nav).
+The trade-off is that component primitives are maintained by hand rather than inherited from a
+framework; this is acceptable at this app's size. Bootstrap references in earlier docs are
+superseded by this ADR. Phase 7 changed **no** models, migrations, routing, form field names,
+or backend behaviour.
+
+---
+
+## ADR-022 — Admin-managed website imagery; `Doctor.profile_image` implemented (C1)
+
+**Context:** After Phases 7.5/F1–F4 the site uses documented static imagery
+(`static/img/…` + `static_exists`/`doctor_portrait` probes; manifest in
+`docs/imagery-licensing.md`). The administrator must be able to upload, replace, preview and
+manage website images through Django Admin without touching templates, CSS, JavaScript, or
+anything under the source-controlled `static/` directory. This reverses **ADR-015**, which
+deliberately omitted `Doctor.profile_image` to keep the dependency set minimal
+(no Pillow) — the requirement supersedes that constraint. `docs/data-model.md` §3.4
+already listed `profile_image`; this ADR fulfils it.
+
+**Decision (implemented in phase C1):**
+1. `clinic.Speciality`: add nullable `image` (`ImageField`, uploaded under `media/`);
+2. `clinic.Doctor`: add nullable `profile_image` (same);
+3. new `website.WebsiteSectionImage` registry (stable `SECTION_KEYS`: `home_hero`,
+   `home_about`, `auth_login_panel`, `auth_register_panel`, `doctors_listing_header`,
+   `doctor_profile_photo_aside`, `specialities_mega_feature`, `doctors_mega_feature`);
+4. Pillow enters `requirements.txt` (backend upload validation, not a frontend dependency —
+   ADR-020 unaffected);
+5. every consumer keeps the current static fallback chain (admin upload → existing
+   static mapping → initials/text-only), so no data migration and zero visual change until
+   an admin uploads something;
+6. admin surfaces are administrator-only (`AdministratorOnlyMixin` rules), media cannot
+   overwrite source-controlled files, and the honesty rules of the imagery manifest apply
+   unchanged (no generic stock photo is ever presented as a real doctor's portrait).
+
+**Consequences:** two new migrations (`clinic`, `website`), a new first-party dependency,
+dev-only media serving in `config/urls.py`, and new manifest duties for the administrator.
+Full plan, acceptance criteria, tests and open decisions:
+`docs/phase-c1-admin-managed-imagery-plan.md`; implementation details and results:
+`docs/phase-c1-admin-managed-imagery-report.md`.
+
+**Implemented State (2026-10-20):**
+- Validation is content-based and shared (`website/image_validation.py`): extension allowlist
+  (JPG/JPEG/PNG/WebP) determined by **decoded Pillow format — not just filename**; SVG and GIF
+  content rejected; size cap overridable via `UPLOAD_IMAGE_MAX_BYTES` (default 2 MiB);
+  dimension/ratio mismatches are **warning-only** admin messages, never rejections.
+- `website.WebsiteSectionImage` runs `full_clean()` in `save()`, so an unknown `key` (slug
+  model) can never be bypassed by a raw ORM insert; registry access via
+  `active_for(key)` (active rows with a bound upload only).
+- Template tags (`website/templatetags/clinic_images.py`) return **ready-to-use URLs** with a
+  fails-closed fallback chain (upload → existing static file → `""`/`None` and a broken
+  `<img>` can never render). `doctor_portrait`, new `speciality_tile_image`, and new
+  `section_image(key, doctor=…)` (formats `{doctor_name}` in captions) feed 11 consumer
+  templates; no consumer wraps the result in a second `{% static %}`.
+- Media serving is **DEBUG-only** in `config/urls.py`; production serving is a deployment
+  decision (web server/object storage + persistent `MEDIA_ROOT` volume).
+- Tests: `website.tests` covers standalone validation, model/registry invariants, admin
+  RBAC (superuser vs ADMIN-role vs plain `is_staff` vs anonymous), invalid/oversized upload
+  rejections, upload→render→clear fallback restoration, the `{doctor_name}` caption
+  formatting, and the DEBUG/media-route contract; `clinic.tests` keeps its admin-model and
+  RBAC suite. Full run: 271 tests OK (1 pre-existing skip), `manage.py check` 0 issues,
+  `makemigrations --check --dry-run` no changes.
+- Visual verification with seeded uploads (licensed stock for atmosphere sections;
+  a neutral abstract placeholder for the portrait) and after clearing them (byte-identical
+  F6-rendered fallbacks), at 1440/390 — screenshots in `phase-c1/shots`.
+- Known scope boundary: deployment media serving and real photo sourcing/licensing steps
+  remain administrative duties outside this codebase change.
+
 ---
 
 ## Open issues requiring employer confirmation

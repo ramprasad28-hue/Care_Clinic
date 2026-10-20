@@ -1,57 +1,184 @@
-<!DOCTYPE html>
-<html lang="en">
+{% load static %}{% load clinic_nav %}<!DOCTYPE html>
+<html lang="en" class="no-js">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Care_Clinic{% endblock %}</title>
-    {% load static %}
+    <meta name="theme-color" content="#0b7c80">
+    <meta name="color-scheme" content="light">
+    <title>{% block title %}Care_Clinic — Clinic appointments{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <script>
+        document.documentElement.classList.remove('no-js');
+        document.documentElement.classList.add('js');
+    </script>
 </head>
 <body>
-    <header class="site-header">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    {% with current=request.resolver_match.view_name %}
+    <header class="site-header{% block header_class %}{% endblock %}{% if user.is_authenticated %} site-header--dense{% endif %}">
         <div class="container header-inner">
-            <a class="brand" href="{% url 'home' %}">Care_Clinic</a>
-            <nav class="nav">
-                <a href="{% url 'speciality_list' %}">Specialities</a>
-                <a href="{% url 'doctor_list' %}">Doctors</a>
-                {% if user.is_authenticated %}
-                    <a href="{% url 'dashboards:landing' %}">Dashboard</a>
-                    <a href="{% url 'appointments:list' %}">My appointments</a>
-                    {% if user.is_doctor %}
-                        <a href="{% url 'clinic:availability_list' %}">My availability</a>
-                        <a href="{% url 'clinic:leave_list' %}">My leave</a>
+            <a class="brand" href="{% url 'home' %}" translate="no">
+                <span class="brand__mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+                </span>
+                <span>Care_Clinic</span>
+            </a>
+
+            <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="site-nav">
+                <span class="nav-toggle__bars" aria-hidden="true"></span>
+                <span class="nav-toggle__label">Menu</span>
+            </button>
+
+            <nav class="site-nav" id="site-nav" aria-label="Primary">
+                <ul class="site-nav__links">
+                    <li><a class="site-nav__link" href="{% url 'home' %}" {% if current == 'home' %}aria-current="page"{% endif %}>Home</a></li>
+                    <li><a class="site-nav__link" href="{% url 'home' %}#about-heading">About</a></li>
+                    <li class="nav-mega">
+                        <a class="site-nav__link nav-mega__plain" href="{% url 'speciality_list' %}" {% if current == 'speciality_list' or current == 'speciality_detail' %}aria-current="page"{% endif %}>Specialities</a>
+                        <button type="button" class="site-nav__link nav-mega__trigger" aria-expanded="false" aria-controls="nav-specialities-menu" data-mega-trigger>
+                            Specialities
+                            <svg class="nav-mega__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        {% include "partials/_nav_mega_panel.html" %}
+                    </li>
+                    <li class="nav-mega">
+                        <a class="site-nav__link nav-mega__plain" href="{% url 'doctor_list' %}" {% if current == 'doctor_list' or current == 'doctor_detail' %}aria-current="page"{% endif %}>Doctors</a>
+                        <button type="button" class="site-nav__link nav-mega__trigger" aria-expanded="false" aria-controls="nav-doctors-menu" data-mega-trigger>
+                            Doctors
+                            <svg class="nav-mega__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        {% include "partials/_nav_doctors_panel.html" %}
+                    </li>
+                    {% if user.is_authenticated %}
+                        {% if user.is_doctor or user.is_staff %}
+                            {# Staff: everything authenticated-specific lives in one Workspace menu — the fixed-width bar cannot hold the console inline (staff rows measured ~1298px vs the ~1086-1160px container) and overflow painted the nav under the identity block. The menu keeps every link reachable; patients keep their approved top-level links. #}
+                            <li class="nav-mega nav-workspace">
+                                <button type="button" class="site-nav__link nav-mega__trigger" aria-expanded="false" aria-controls="nav-workspace-menu" data-mega-trigger>
+                                    Workspace
+                                    <svg class="nav-mega__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                                </button>
+                                <div class="nav-mega__panel nav-workspace__panel" id="nav-workspace-menu" role="region" aria-label="Workspace menu">
+                                    <ul class="nav-workspace__list">
+                                        <li><a class="nav-workspace__item" href="{% url 'dashboards:landing' %}" {% if current|slice:':11' == 'dashboards:' %}aria-current="page"{% endif %}>Dashboard</a></li>
+                                        <li><a class="nav-workspace__item" href="{% url 'appointments:list' %}" {% if current == 'appointments:list' %}aria-current="page"{% endif %}>My appointments</a></li>
+                                        {% if user.is_doctor %}
+                                            <li><a class="nav-workspace__item" href="{% url 'clinic:availability_list' %}" {% if current|slice:':7' == 'clinic:' %}aria-current="page"{% endif %}>Availability</a></li>
+                                            <li><a class="nav-workspace__item" href="{% url 'clinic:leave_list' %}">My leave</a></li>
+                                        {% endif %}
+                                        {% if user.is_staff %}
+                                            <li><a class="nav-workspace__item" href="{% url 'admin:index' %}">Django admin</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            </li>
+                        {% else %}
+                            <li><a class="site-nav__link" href="{% url 'dashboards:landing' %}" {% if current|slice:':11' == 'dashboards:' %}aria-current="page"{% endif %}>Dashboard</a></li>
+                            <li><a class="site-nav__link" href="{% url 'appointments:list' %}" {% if current == 'appointments:list' %}aria-current="page"{% endif %}>My appointments</a></li>
+                        {% endif %}
                     {% endif %}
-                    <span class="nav-user">Signed in as {{ user.email }} <em>({{ user.get_role_display }})</em></span>
-                    {% if user.is_staff %}
-                        <a href="{% url 'admin:index' %}">Admin</a>
+                </ul>
+
+                <div class="site-nav__account">
+                    {% if user.is_authenticated %}
+                        <span class="site-user">
+                            <span class="site-user__email">{{ user.email }}</span>
+                            <span class="site-user__role">{{ user.get_role_display }}</span>
+                        </span>
+                        <a class="btn btn--primary btn--sm btn--arrow" href="{% url 'doctor_list' %}">Book appointment<span class="btn__disc" aria-hidden="true"><svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+                        <form method="post" action="{% url 'accounts:logout' %}" class="inline-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn--secondary btn--sm">Log out</button>
+                        </form>
+                    {% else %}
+                        <a class="link-button" href="{% url 'accounts:login' %}">Log in</a>
+                        <a class="btn btn--secondary btn--sm" href="{% url 'accounts:register' %}">Register</a>
+                        <a class="btn btn--primary btn--sm btn--arrow" href="{% url 'doctor_list' %}">Book appointment<span class="btn__disc" aria-hidden="true"><svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
                     {% endif %}
-                    <form method="post" action="{% url 'accounts:logout' %}" class="inline-form">
-                        {% csrf_token %}
-                        <button type="submit" class="link-button">Log out</button>
-                    </form>
-                {% else %}
-                    <a href="{% url 'accounts:login' %}">Log in</a>
-                    <a href="{% url 'accounts:register' %}">Register</a>
-                {% endif %}
+                </div>
             </nav>
         </div>
     </header>
+    {% endwith %}
 
-    <main class="container">
+    <main id="main-content" class="{% block main_class %}{% endblock %}">
         {% if messages %}
-            <ul class="messages">
-                {% for message in messages %}
-                    <li class="message {{ message.tags }}">{{ message }}</li>
-                {% endfor %}
-            </ul>
+            <div class="container">
+                <ul class="messages" aria-label="Notifications">
+                    {% for message in messages %}
+                        <li class="message {{ message.tags }}" role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}">
+                            <span class="message__icon" aria-hidden="true">{% if message.tags == 'success' %}OK{% elif message.tags == 'error' %}!{% elif message.tags == 'warning' %}!{% else %}i{% endif %}</span>
+                            <span>
+                                <span class="message__label">{% if message.tags == 'success' %}Success:{% elif message.tags == 'error' %}Error:{% elif message.tags == 'warning' %}Warning:{% else %}Notice:{% endif %}</span>
+                                {{ message }}
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
         {% endif %}
+
         {% block content %}{% endblock %}
     </main>
 
     <footer class="site-footer">
-        <div class="container">
-            <p>Care_Clinic — Clinic Appointment Management System</p>
+        <div class="container site-footer__inner">
+            <div class="site-footer__brandcol">
+                <a class="site-footer__brand" href="{% url 'home' %}" translate="no">
+                    <span class="brand__mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+                    </span>
+                    <span>Care_Clinic</span>
+                </a>
+                <p class="site-footer__tagline">
+                    Clinic appointment management — find a speciality, choose a doctor,
+                    and book an open time in one place.
+                </p>
+            </div>
+
+            <nav class="site-footer__col" aria-label="Patients">
+                <h2 class="site-footer__heading">Patients</h2>
+                <ul>
+                    <li><a href="{% url 'doctor_list' %}">Book an appointment</a></li>
+                    {% if user.is_authenticated %}
+                        <li><a href="{% url 'appointments:list' %}">My appointments</a></li>
+                        <li><a href="{% url 'dashboards:landing' %}">Dashboard</a></li>
+                    {% else %}
+                        <li><a href="{% url 'accounts:register' %}">Create an account</a></li>
+                        <li><a href="{% url 'accounts:login' %}">Log in</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+
+            <nav class="site-footer__col" aria-label="Explore">
+                <h2 class="site-footer__heading">Explore</h2>
+                <ul>
+                    <li><a href="{% url 'home' %}">Home</a></li>
+                    <li><a href="{% url 'speciality_list' %}">Specialities</a></li>
+                    <li><a href="{% url 'doctor_list' %}">Doctors</a></li>
+                </ul>
+            </nav>
+
+            <nav class="site-footer__col" aria-label="Departments">
+                <h2 class="site-footer__heading">Departments</h2>
+                <ul>
+                    {% footer_specialities as footer_specialities %}
+                    {% for speciality in footer_specialities %}
+                        <li><a href="{% url 'speciality_detail' speciality.slug %}">{{ speciality.name }}</a></li>
+                    {% endfor %}
+                </ul>
+            </nav>
         </div>
+
+        <div class="container site-footer__bottom">
+            <p>Care_Clinic — Clinic Appointment Management System</p>
+            <p>&copy; {% now "Y" %} Care_Clinic</p>
+        </div>
+
+        <div class="site-footer__mark" aria-hidden="true" translate="no">Care_Clinic</div>
     </footer>
+
+    <script src="{% static 'js/app.js' %}" defer></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

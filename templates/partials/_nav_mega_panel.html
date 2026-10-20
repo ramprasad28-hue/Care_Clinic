@@ -1,0 +1,42 @@
+{% load static %}
+{% load clinic_nav %}
+{% load clinic_images %}
+{% footer_specialities as menu_specialities %}
+{% section_image 'specialities_mega_feature' as feature_photo %}
+<div class="nav-mega__panel" id="nav-specialities-menu" role="region" aria-label="Specialities menu">
+    <div class="nav-mega__grid">
+        <div class="nav-mega__list">
+            {% for speciality in menu_specialities %}
+                {% speciality_tile_image speciality as tile_url %}
+                <a class="nav-mega__item" href="{% url 'speciality_detail' speciality.slug %}">
+                    {% if tile_url %}
+                        <span class="nav-mega__tile" aria-hidden="true">
+                            <img src="{{ tile_url }}" alt="" width="900" height="600" loading="lazy" decoding="async">
+                        </span>
+                    {% endif %}
+                    <span class="nav-mega__text">
+                        <span class="nav-mega__name">{{ speciality.name }}</span>
+                        {% if speciality.description %}
+                            <span class="nav-mega__desc">{{ speciality.description|truncatechars:90 }}</span>
+                        {% endif %}
+                    </span>
+                </a>
+            {% endfor %}
+        </div>
+        {% if menu_specialities and feature_photo %}
+        <aside class="nav-mega__aside">
+            <figure class="nav-mega__feature">
+                <img src="{{ feature_photo.url }}" alt="" width="1200" height="960" loading="lazy" decoding="async">
+            </figure>
+            <div class="nav-mega__feature-body">
+                <span class="nav-mega__feature-title">New to Care_Clinic?</span>
+                <span class="nav-mega__feature-text">See doctors who are accepting appointments and pick an open time.</span>
+                <a class="btn btn--primary btn--sm btn--arrow" href="{% url 'doctor_list' %}">Find a doctor<span class="btn__disc" aria-hidden="true"><svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+            </div>
+        </aside>
+        {% endif %}
+    </div>
+    <div class="nav-mega__foot">
+        <a class="nav-mega__all" href="{% url 'speciality_list' %}">View all specialities<span class="nav-mega__all-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+    </div>
+</div>

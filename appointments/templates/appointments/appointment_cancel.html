@@ -3,20 +3,43 @@
 {% block title %}Cancel {{ appointment.reference }} — Care_Clinic{% endblock %}
 
 {% block content %}
-<div class="auth-panel">
-    <h1>Cancel appointment</h1>
-    <p>Are you sure you want to cancel <strong>{{ appointment.reference }}</strong> with
-        Dr. {{ appointment.doctor.user.get_full_name }} on
-        {{ appointment.date|date:"D j M Y" }} at {{ appointment.start_time|time:"H:i" }}?</p>
-
-    <form method="post">
-        {% csrf_token %}
+<div class="container container--form">
+    <section class="confirm" aria-labelledby="cancel-heading">
+        <h1 id="cancel-heading">Cancel appointment</h1>
         <p>
-            {{ form.reason.label_tag }}
-            {{ form.reason }}
+            Are you sure you want to cancel <strong>{{ appointment.reference }}</strong> with
+            Dr. {{ appointment.doctor.user.get_full_name }} on
+            {{ appointment.date|date:"D j M Y" }} at {{ appointment.start_time|time:"H:i" }}?
         </p>
-        <button type="submit" class="btn btn-primary danger">Yes, cancel appointment</button>
-        <a class="btn btn-secondary" href="{{ appointment.get_absolute_url }}">Keep appointment</a>
-    </form>
+
+        <dl class="cancel-summary" aria-label="Appointment being cancelled">
+            <div>
+                <dt>Doctor</dt>
+                <dd>Dr. {{ appointment.doctor.user.get_full_name }}</dd>
+            </div>
+            <div>
+                <dt>Date &amp; time</dt>
+                <dd>{{ appointment.date|date:"D j M Y" }} · {{ appointment.start_time|time:"H:i" }}–{{ appointment.end_time|time:"H:i" }}</dd>
+            </div>
+            <div>
+                <dt>Reference</dt>
+                <dd translate="no">{{ appointment.reference }}</dd>
+            </div>
+        </dl>
+
+        <div class="confirm-note" role="note">
+            <p>Cancelling releases the slot so other patients can book it. You can book a new visit at any time.</p>
+        </div>
+
+        <form method="post" class="form" novalidate data-guard>
+            {% csrf_token %}
+            {% include "partials/_form_errors.html" with form=form %}
+            {% include "partials/_field.html" with field=form.reason %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn--danger">Yes, cancel appointment</button>
+                <a class="btn btn--secondary" href="{{ appointment.get_absolute_url }}">Keep appointment</a>
+            </div>
+        </form>
+    </section>
 </div>
 {% endblock %}

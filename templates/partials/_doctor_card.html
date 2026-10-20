@@ -1,0 +1,43 @@
+{% load static %}
+{% load clinic_images %}
+{% comment %}Public doctor card. Expects `doctor`. Renders an <li> for `.doctor-grid`.
+Shared by the homepage, the doctor listing, and speciality detail.
+Individual portrait via `doctor_portrait` (admin upload first, then the
+slug-mapped static placeholder when the file exists; initials avatar
+otherwise — never a broken image). No invented data. All links are real: the
+profile page and the live booking route for this doctor. The portrait is
+decorative (alt="") — the name next to it carries the meaning — and while an
+upload is a presumed-genuine portrait, the static placeholder is licensed
+demo stock, NOT a verified photograph of this real clinic doctor
+(docs/imagery-licensing.md).
+{% endcomment %}
+<li class="doctor-card">
+    <div class="doctor-card__head">
+        {% doctor_portrait doctor as portrait_url %}
+        {% if portrait_url %}
+            <span class="avatar avatar--photo" aria-hidden="true"><img src="{{ portrait_url }}" alt="" loading="lazy" decoding="async"></span>
+        {% else %}
+            <span class="avatar" aria-hidden="true">{{ doctor.user.first_name|slice:":1" }}{{ doctor.user.last_name|slice:":1" }}</span>
+        {% endif %}
+        <div>
+            <h3 class="doctor-card__name">
+                <a href="{{ doctor.get_absolute_url }}">Dr. {{ doctor.user.get_full_name }}</a>
+            </h3>
+            <p class="doctor-card__spec">{{ doctor.speciality.name }}</p>
+        </div>
+    </div>
+    <ul class="doctor-card__meta">
+        {% if doctor.qualification %}<li>{{ doctor.qualification }}</li>{% endif %}
+        {% if doctor.consultation_fee %}<li>₹{{ doctor.consultation_fee|floatformat }} consultation</li>{% endif %}
+        {% if doctor.is_accepting_appointments %}<li class="doctor-card__meta-open">Accepting appointments</li>{% endif %}
+    </ul>
+    <div class="doctor-card__actions">
+        {% if doctor.is_accepting_appointments %}
+            <a class="btn btn--sm btn--primary" href="{% url 'appointments:book' doctor.slug %}">Book appointment</a>
+        {% endif %}
+        <a class="doctor-card__link" href="{{ doctor.get_absolute_url }}">
+            View profile
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+    </div>
+</li>

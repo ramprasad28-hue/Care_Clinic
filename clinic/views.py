@@ -10,6 +10,7 @@ Authorization is enforced on the backend:
 * Create/update views force ``instance.doctor`` from ``request.user`` and the
   forms do not expose a ``doctor`` field, so a submitted doctor id is ignored.
 """
+from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import PermissionDenied
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
@@ -46,22 +47,36 @@ class AvailabilityListView(DoctorSelfServiceMixin, ListView):
         )
 
 
-class AvailabilityCreateView(DoctorSelfServiceMixin, CreateView):
+class AvailabilityCreateView(DoctorSelfServiceMixin, SuccessMessageMixin, CreateView):
     model = AvailabilityRule
     form_class = AvailabilityRuleForm
     template_name = "clinic/availability_form.html"
     success_url = reverse_lazy("clinic:availability_list")
+    success_message = "Availability rule was added."
+
+    def get_form(self, *args, **kwargs):
+        form = super().get_form(*args, **kwargs)
+        """Attach the doctor before validation so the model overlap check in
+        full_clean() surface as inline form errors instead of a 500."""
+        form.instance.doctor = self.get_doctor()
+        return form
 
     def form_valid(self, form):
         form.instance.doctor = self.get_doctor()
         return super().form_valid(form)
 
 
-class AvailabilityUpdateView(DoctorSelfServiceMixin, UpdateView):
+class AvailabilityUpdateView(DoctorSelfServiceMixin, SuccessMessageMixin, UpdateView):
     model = AvailabilityRule
     form_class = AvailabilityRuleForm
     template_name = "clinic/availability_form.html"
     success_url = reverse_lazy("clinic:availability_list")
+    success_message = "Availability rule was updated."
+
+    def get_form(self, *args, **kwargs):
+        form = super().get_form(*args, **kwargs)
+        form.instance.doctor = self.get_doctor()
+        return form
 
     def get_queryset(self):
         return AvailabilityRule.objects.filter(doctor=self.get_doctor())
@@ -91,11 +106,12 @@ class LeaveListView(DoctorSelfServiceMixin, ListView):
         return DoctorLeave.objects.filter(doctor=self.get_doctor()).order_by("-start_date")
 
 
-class LeaveCreateView(DoctorSelfServiceMixin, CreateView):
+class LeaveCreateView(DoctorSelfServiceMixin, SuccessMessageMixin, CreateView):
     model = DoctorLeave
     form_class = DoctorLeaveForm
     template_name = "clinic/leave_form.html"
     success_url = reverse_lazy("clinic:leave_list")
+    success_message = "Leave was added."
 
     def form_valid(self, form):
         form.instance.doctor = self.get_doctor()

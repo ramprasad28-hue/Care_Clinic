@@ -3,42 +3,46 @@
 {% block title %}Appointments — Care_Clinic{% endblock %}
 
 {% block content %}
-<h1>Appointments</h1>
+<div class="container">
+    <div class="page-head">
+        <span class="section-rule" aria-hidden="true"></span>
+        <h1>Appointments</h1>
+        {% if user.is_patient %}
+            <p>Your bookings. To book a new visit, start from the doctors list.</p>
+        {% endif %}
+    </div>
 
-{% if user.is_patient %}
-    <p class="muted">Your bookings. Use the doctor pages to book a new appointment.</p>
-{% endif %}
+    <div class="cluster mb-5">
+        <a class="btn {% if scope != 'past' %}btn--primary{% else %}btn--secondary{% endif %}"
+           href="?scope=upcoming" {% if scope != 'past' %}aria-current="page"{% endif %}>Upcoming</a>
+        <a class="btn {% if scope == 'past' %}btn--primary{% else %}btn--secondary{% endif %}"
+           href="?scope=past" {% if scope == 'past' %}aria-current="page"{% endif %}>Past</a>
+        {% if user.is_patient %}
+            <a class="btn btn--secondary" href="{% url 'doctor_list' %}">Book a new appointment</a>
+        {% endif %}
+    </div>
 
-<p class="filter-bar">
-    <a class="btn {% if scope != 'past' %}btn-primary{% else %}btn-secondary{% endif %}"
-       href="?scope=upcoming">Upcoming</a>
-    <a class="btn {% if scope == 'past' %}btn-primary{% else %}btn-secondary{% endif %}"
-       href="?scope=past">Past</a>
-</p>
-
-{% if appointments %}
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Reference</th><th>Date</th><th>Time</th><th>Doctor</th>
-                <th>Patient</th><th>Status</th><th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for appointment in appointments %}
-                <tr>
-                    <td><a href="{{ appointment.get_absolute_url }}">{{ appointment.reference }}</a></td>
-                    <td>{{ appointment.date|date:"D j M Y" }}</td>
-                    <td>{{ appointment.start_time|time:"H:i" }}–{{ appointment.end_time|time:"H:i" }}</td>
-                    <td>Dr. {{ appointment.doctor.user.get_full_name }}</td>
-                    <td>{{ appointment.patient.get_full_name }}</td>
-                    <td>{% include "appointments/_status_badge.html" %}</td>
-                    <td><a href="{{ appointment.get_absolute_url }}">View</a></td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <p class="muted">No appointments to show.</p>
-{% endif %}
+    {% if appointments %}
+        {% include "dashboards/_appointment_table.html" with appointments=appointments show_actions=False %}
+    {% elif scope == 'past' and user.is_patient %}
+        <div class="empty">
+            <h2>No past appointments yet</h2>
+            <p>Once you have attended visits, they will be listed here for your history.</p>
+        </div>
+    {% elif scope == 'past' %}
+        <div class="empty">
+            <h2>No past appointments to show</h2>
+        </div>
+    {% elif user.is_patient %}
+        <div class="empty">
+            <h2>No upcoming appointments</h2>
+            <p>You have nothing booked right now. Browse the doctors list to pick a time that suits you.</p>
+            <p><a class="btn btn--primary" href="{% url 'doctor_list' %}">Choose a doctor</a></p>
+        </div>
+    {% else %}
+        <div class="empty">
+            <h2>No upcoming appointments</h2>
+        </div>
+    {% endif %}
+</div>
 {% endblock %}

@@ -1,35 +1,66 @@
 {% extends "base.html" %}
+{% load static %}
+{% load clinic_images %}
 
 {% block title %}Doctors — Care_Clinic{% endblock %}
 
 {% block content %}
-<h1>Doctors</h1>
+{% section_image 'doctors_listing_header' as header_photo %}
+<section class="page-hero{% if header_photo %} page-hero--media{% endif %}">
+    <div class="container page-hero__grid">
+        <div class="page-hero__copy">
+            <span class="section-rule" aria-hidden="true"></span>
+            <p class="eyebrow">Doctor directory</p>
+            <h1>Doctors</h1>
+            <p class="page-hero__lede">Doctors who are currently accepting appointments. Filter by speciality to narrow the list.</p>
+            <p class="page-hero__count">{{ doctors|length }} doctor{{ doctors|length|pluralize }} accepting appointments</p>
+            <div class="page-hero__actions">
+                <a class="btn btn--primary" href="#doctor-directory">Browse directory</a>
+            </div>
+        </div>
+        {% if header_photo %}
+        <figure class="page-hero__media">
+            <div class="figure-plate__frame page-hero__frame figure-plate__frame--54">
+                <img src="{{ header_photo.url }}" alt="{{ header_photo.alt }}" width="1200" height="960" loading="eager" decoding="async">
+            </div>
+            <figcaption class="figure-plate__caption">{{ header_photo.caption }}</figcaption>
+        </figure>
+        {% endif %}
+    </div>
+</section>
 
-<form method="get" class="filter-bar">
-    <label for="speciality">Filter by speciality</label>
-    <select name="speciality" id="speciality" onchange="this.form.submit()">
-        <option value="">All specialities</option>
-        {% for speciality in specialities %}
-            <option value="{{ speciality.slug }}"
-                {% if speciality.slug == selected_speciality %}selected{% endif %}>
-                {{ speciality.name }}
-            </option>
-        {% endfor %}
-    </select>
-    <noscript><button type="submit" class="btn btn-secondary">Filter</button></noscript>
-</form>
+<section class="band band--compact" id="doctor-directory" aria-label="Doctor directory filter">
+    <div class="container">
+        <form method="get" class="filter-bar" role="search">
+            <div class="field">
+                <label class="field__label" for="speciality">Filter by speciality</label>
+                <select name="speciality" id="speciality" data-autosubmit>
+                    <option value="">All specialities</option>
+                    {% for speciality in specialities %}
+                        <option value="{{ speciality.slug }}"
+                            {% if speciality.slug == selected_speciality %}selected{% endif %}>
+                            {{ speciality.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn--primary">Filter</button>
+        </form>
+    </div>
+</section>
 
 {% if doctors %}
-    <ul class="card-grid">
-        {% for doctor in doctors %}
-            <li class="card">
-                <a class="card-title" href="{{ doctor.get_absolute_url }}">Dr. {{ doctor.user.get_full_name }}</a>
-                <p class="muted">{{ doctor.speciality.name }}{% if doctor.qualification %} · {{ doctor.qualification }}{% endif %}</p>
-                <a class="btn btn-secondary" href="{{ doctor.get_absolute_url }}">View profile</a>
-            </li>
-        {% endfor %}
-    </ul>
+    <section class="band band--compact band--flush-top" aria-label="Doctors accepting appointments">
+        <div class="container">
+            <ul class="doctor-grid">
+                {% for doctor in doctors %}
+                    {% include "partials/_doctor_card.html" with doctor=doctor %}
+                {% endfor %}
+            </ul>
+        </div>
+    </section>
 {% else %}
-    <p class="muted">No doctors match this filter.</p>
+    {% url 'doctor_list' as all_doctors_url %}
+    {% include "partials/_empty.html" with mark="+" title="No doctors match this filter" text="Try a different speciality, or clear the filter to see everyone accepting appointments." action_url=all_doctors_url action_label="Clear filter" show_action=selected_speciality %}
 {% endif %}
 {% endblock %}

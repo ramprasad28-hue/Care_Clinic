@@ -113,7 +113,9 @@ class PatientDashboardView(RoleRequiredMixin, TemplateView):
             .select_related("doctor__user", "doctor__speciality", "patient", "slot")
         )
         today = timezone.localdate()
-        upcoming = base.filter(date__gte=today).order_by("date", "start_time")[:10]
+        upcoming = (
+            base.filter(date__gte=today).active().order_by("date", "start_time")[:10]
+        )
         history = base.filter(date__lt=today).order_by("-date", "-start_time")[:10]
         _attach_actions(upcoming, user)
         _attach_actions(history, user)

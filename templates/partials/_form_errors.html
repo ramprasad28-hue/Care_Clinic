@@ -1,0 +1,11 @@
+{% comment %}Non-field form errors, announced to assistive tech. Expects `form`.{% endcomment %}
+{% if form.non_field_errors %}
+    <div class="form-alerts">
+        {% for error in form.non_field_errors %}
+            <div class="message error" role="alert">
+                <span class="message__icon" aria-hidden="true">!</span>
+                <span><span class="message__label">Error:</span> {{ error }}</span>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}

@@ -1,25 +1,59 @@
 {% extends "base.html" %}
+{% load static %}
+{% load clinic_images %}
 
 {% block title %}{{ speciality.name }} — Care_Clinic{% endblock %}
 
 {% block content %}
-<p class="breadcrumb"><a href="{% url 'speciality_list' %}">Specialities</a> / {{ speciality.name }}</p>
+{% speciality_tile_image speciality as spec_image %}
+<section class="page-hero{% if spec_image %} page-hero--media{% endif %}">
+    <div class="container page-hero__grid">
+        <div class="page-hero__copy">
+            <nav aria-label="Breadcrumb">
+                <ol class="breadcrumb">
+                    <li><a href="{% url 'speciality_list' %}">Specialities</a></li>
+                    <li aria-current="page">{{ speciality.name }}</li>
+                </ol>
+            </nav>
+            <span class="section-rule" aria-hidden="true"></span>
+            <p class="eyebrow">Speciality</p>
+            <h1>{{ speciality.name }}</h1>
+            {% if speciality.description %}<p class="page-hero__lede">{{ speciality.description }}</p>{% endif %}
+            <p class="page-hero__count">{{ doctors|length }} doctor{{ doctors|length|pluralize }} accepting appointments</p>
+            <div class="page-hero__actions">
+                <a class="btn btn--primary" href="#doctors">Meet the doctors</a>
+                <a class="btn btn--ghost" href="{% url 'speciality_list' %}">All specialities</a>
+            </div>
+        </div>
+        {% if spec_image %}
+            <figure class="page-hero__media">
+                <div class="figure-plate__frame page-hero__frame">
+                    <img src="{{ spec_image }}" alt="" width="900" height="600" loading="eager" decoding="async">
+                </div>
+                {% if speciality.image_caption %}
+                    <figcaption class="figure-plate__caption">{{ speciality.image_caption }}</figcaption>
+                {% elif not speciality.image %}
+                    <figcaption class="figure-plate__caption">Illustrative stock photo</figcaption>
+                {% endif %}
+            </figure>
+        {% endif %}
+    </div>
+</section>
 
-<h1>{{ speciality.name }}</h1>
-{% if speciality.description %}<p class="lead">{{ speciality.description }}</p>{% endif %}
-
-<h2>Doctors in this speciality</h2>
-{% if doctors %}
-    <ul class="card-grid">
-        {% for doctor in doctors %}
-            <li class="card">
-                <a class="card-title" href="{{ doctor.get_absolute_url }}">Dr. {{ doctor.user.get_full_name }}</a>
-                <p class="muted">{{ doctor.qualification }}</p>
-                <a class="btn btn-secondary" href="{{ doctor.get_absolute_url }}">View profile</a>
-            </li>
-        {% endfor %}
-    </ul>
-{% else %}
-    <p class="muted">No doctors are currently available in this speciality.</p>
-{% endif %}
+<section class="band band--tint" id="doctors" aria-labelledby="doctors-heading">
+    <div class="container">
+        <span class="section-rule" aria-hidden="true"></span>
+        <h2 class="section-title" id="doctors-heading">Doctors in this speciality</h2>
+        {% if doctors %}
+            <ul class="doctor-grid">
+                {% for doctor in doctors %}
+                    {% include "partials/_doctor_card.html" with doctor=doctor %}
+                {% endfor %}
+            </ul>
+        {% else %}
+            {% url 'doctor_list' as all_doctors_url %}
+            {% include "partials/_empty.html" with mark="+" level=3 title="No doctors currently available" text="There are no doctors accepting appointments in this speciality right now. Browse the full list of doctors for other specialities." action_url=all_doctors_url action_label="All doctors" show_action=True %}
+        {% endif %}
+    </div>
+</section>
 {% endblock %}

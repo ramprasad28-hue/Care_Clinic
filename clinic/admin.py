@@ -11,10 +11,16 @@ navigation links:
   is scoped to ``doctor__user=request.user`` and ``save_model`` forces ownership
   from the session, so a submitted doctor id cannot be used to hijack another
   doctor's records.
+* Image uploads (ADR-022, C1): ``Speciality.image`` / ``Doctor.profile_image``
+  are administrator-managed uploads with preview widgets; dimension/ratio
+  guidance is surfaced as warnings after a successful save.
 """
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
+from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 
+from .forms import DoctorAdminForm, SpecialityAdminForm
 from .models import AvailabilityRule, Doctor, DoctorLeave, Speciality
 
 User = get_user_model()
@@ -107,6 +113,20 @@ class DoctorOwnedAdminMixin:
         super().save_model(request, obj, form, change)
 
 
+class ImageWarningAdminMixin:
+    """Surface form-reported image warnings after a successful save (ADR-022).
+
+    Dimension/ratio observations never block an otherwise valid upload (plan
+    rule: prefer warnings over rejections); they surface here as non-fatal
+    admin messages.
+    """
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        for warning in getattr(form, "image_warnings", []):
+            self.message_user(request, warning, level=messages.WARNING)
+
+
 class AvailabilityRuleInline(admin.TabularInline):
     model = AvailabilityRule
     extra = 1
@@ -119,14 +139,41 @@ class DoctorLeaveInline(admin.TabularInline):
     fields = ("start_date", "end_date", "reason")
 
 
+def _media_src(image_field_file):
+    """Usable media URL for an upload, or "" when nothing is set/cleared."""
+    if not image_field_file:
+        return ""
+    try:
+        return image_field_file.url
+    except ValueError:
+        return ""
+
+
 @admin.register(Speciality)
-class SpecialityAdmin(AdministratorOnlyMixin, admin.ModelAdmin):
-    list_display = ("name", "slug", "is_active", "doctor_count", "updated_at")
+class SpecialityAdmin(ImageWarningAdminMixin, AdministratorOnlyMixin, admin.ModelAdmin):
+    form = SpecialityAdminForm
+    list_display = ("name", "slug", "image_thumb", "is_active", "doctor_count", "updated_at")
     list_filter = ("is_active",)
     search_fields = ("name", "description")
     prepopulated_fields = {"slug": ("name",)}
     ordering = ("name",)
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("image_preview", "created_at", "updated_at")
+
+    def image_thumb(self, obj):
+        src = _media_src(obj.image)
+        if not src:
+            return "—"
+        return format_html('<img src="{}" style="max-height:52px;border-radius:4px" alt="">', src)
+    image_thumb.short_description = _("Image")
+
+    @admin.display(description=_("Current image"))
+    def image_preview(self, obj):
+        src = _media_src(obj.image)
+        if not src:
+            return _("No image uploaded — the static fallback (if any) is shown on the site.")
+        return format_html(
+            '<img src="{}" style="max-height:140px;border-radius:6px" alt="">', src
+        )
 
     @admin.display(description="Doctors")
     def doctor_count(self, obj):
@@ -134,10 +181,12 @@ class SpecialityAdmin(AdministratorOnlyMixin, admin.ModelAdmin):
 
 
 @admin.register(Doctor)
-class DoctorAdmin(AdministratorOnlyMixin, admin.ModelAdmin):
+class DoctorAdmin(ImageWarningAdminMixin, AdministratorOnlyMixin, admin.ModelAdmin):
+    form = DoctorAdminForm
     list_display = (
         "full_name",
         "speciality",
+        "portrait_thumb",
         "registration_number",
         "is_accepting_appointments",
         "user_is_active",
@@ -154,8 +203,26 @@ class DoctorAdmin(AdministratorOnlyMixin, admin.ModelAdmin):
     autocomplete_fields = ("user", "speciality")
     ordering = ("user__first_name", "user__last_name")
     list_select_related = ("user", "speciality")
-    readonly_fields = ("created_at", "updated_at", "slug")
+    readonly_fields = ("portrait_preview", "created_at", "updated_at", "slug")
     inlines = [AvailabilityRuleInline, DoctorLeaveInline]
+
+    def portrait_thumb(self, obj):
+        src = _media_src(obj.profile_image)
+        if not src:
+            return "—"
+        return format_html('<img src="{}" style="max-height:52px;border-radius:4px" alt="">', src)
+    portrait_thumb.short_description = _("Portrait")
+
+    @admin.display(description=_("Current portrait"))
+    def portrait_preview(self, obj):
+        src = _media_src(obj.profile_image)
+        if not src:
+            return _(
+                "No portrait uploaded — the static placeholder or initials avatar is shown on the site."
+            )
+        return format_html(
+            '<img src="{}" style="max-height:140px;border-radius:6px" alt="">', src
+        )
 
     @admin.display(description="Name", ordering="user__first_name")
     def full_name(self, obj):

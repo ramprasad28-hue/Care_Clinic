@@ -19,6 +19,13 @@ mysqlclient>=2.2,<3.0
 # --- Configuration / secrets loading ---
 python-dotenv>=1.0,<2.0
 
+# --- Image upload validation (backend only; ADR-022 / phase C1) ---
+# Pillow validates administrator-uploaded images (JPEG/PNG/WebP, decode
+# + size cap) for Speciality.image, Doctor.profile_image and
+# website.WebsiteSectionImage. ADR-020 (no frontend framework/build step)
+# is unaffected: this is not a frontend dependency.
+Pillow>=10.0,<12.0
+
 # --- Development & testing ---
 pytest>=8.0,<9.0
 pytest-django>=4.8,<5.0

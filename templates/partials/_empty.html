@@ -1,0 +1,17 @@
+{% comment %}
+Reusable empty state. Params:
+  title       — short heading (required)
+  text        — supporting sentence (optional)
+  level       — heading level, e.g. 2 or 3, matching the surrounding section
+                (optional; defaults to 2)
+  mark        — single glyph shown in the round badge (optional; hidden if omitted)
+  action_url  — a single secondary action link (optional)
+  action_label— visible label for that action (optional)
+  show_action — truthy to reveal the action (optional)
+{% endcomment %}
+<div class="empty">
+    {% if mark %}<span class="empty__mark" aria-hidden="true">{{ mark }}</span>{% endif %}
+    <h{{ level|default:"2" }}>{{ title }}</h{{ level|default:"2" }}>
+    {% if text %}<p>{{ text }}</p>{% endif %}
+    {% if action_url and action_label and show_action %}<a class="btn btn--secondary" href="{{ action_url }}">{{ action_label }}</a>{% endif %}
+</div>

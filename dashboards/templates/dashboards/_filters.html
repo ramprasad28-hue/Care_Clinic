@@ -1,8 +1,13 @@
 {% comment %}Shared search/filter form. Expects filter_form.{% endcomment %}
-<form method="get" class="filter-form">
-    {{ filter_form.as_p }}
-    <p class="filter-actions">
-        <button type="submit" class="btn btn-primary">Apply</button>
-        <a class="btn btn-secondary" href="{{ request.path }}">Reset</a>
-    </p>
+<form method="get" class="filters">
+    <p class="filters__title">Filter appointments</p>
+    <div class="filters__grid">
+        {% for field in filter_form %}
+            {% include "partials/_field.html" with field=field %}
+        {% endfor %}
+    </div>
+    <div class="filters__actions">
+        <button type="submit" class="btn btn--primary">Apply filters</button>
+        <a class="btn btn--secondary" href="{{ request.path }}">Reset</a>
+    </div>
 </form>

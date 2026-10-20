@@ -1,0 +1,44 @@
+{% load static %}{% load clinic_nav %}{% load clinic_images %}
+{% nav_doctors as menu_doctors %}
+{% section_image 'doctors_mega_feature' as doctors_photo %}
+<div class="nav-mega__panel" id="nav-doctors-menu" role="region" aria-label="Doctors menu">
+    <div class="nav-mega__grid">
+        <div class="nav-mega__list">
+            {% for doctor in menu_doctors %}
+                <a class="nav-mega__item" href="{{ doctor.get_absolute_url }}">
+                    {% doctor_portrait doctor as doctor_portrait_url %}
+                    {% if doctor_portrait_url %}
+                        <span class="avatar nav-mega__avatar avatar--photo" aria-hidden="true"><img src="{{ doctor_portrait_url }}" alt="" loading="eager" decoding="async"></span>
+                    {% else %}
+                        <span class="avatar nav-mega__avatar" aria-hidden="true">{{ doctor.user.first_name|slice:":1" }}{{ doctor.user.last_name|slice:":1" }}</span>
+                    {% endif %}
+                    <span class="nav-mega__text">
+                        <span class="nav-mega__name">Dr. {{ doctor.user.get_full_name }}</span>
+                        {% if doctor.speciality %}
+                            <span class="nav-mega__desc">{{ doctor.speciality.name }}{% if doctor.qualification %} · {{ doctor.qualification }}{% endif %}</span>
+                        {% elif doctor.qualification %}
+                            <span class="nav-mega__desc">{{ doctor.qualification }}</span>
+                        {% endif %}
+                    </span>
+                </a>
+            {% empty %}
+                <p class="nav-mega__empty">No doctors are accepting appointments right now. Please check back soon.</p>
+            {% endfor %}
+        </div>
+        {% if menu_doctors and doctors_photo %}
+        <aside class="nav-mega__aside">
+            <figure class="nav-mega__feature">
+                <img src="{{ doctors_photo.url }}" alt="" width="1600" height="1200" loading="eager" decoding="async">
+            </figure>
+            <div class="nav-mega__feature-body">
+                <span class="nav-mega__feature-title">Find the right doctor</span>
+                <span class="nav-mega__feature-text">Browse the doctors currently accepting appointments and pick an open time that suits you.</span>
+                <a class="btn btn--primary btn--sm btn--arrow" href="{% url 'doctor_list' %}">Find a doctor<span class="btn__disc" aria-hidden="true"><svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+            </div>
+        </aside>
+        {% endif %}
+    </div>
+    <div class="nav-mega__foot">
+        <a class="nav-mega__all" href="{% url 'doctor_list' %}">View all doctors<span class="nav-mega__all-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+    </div>
+</div>

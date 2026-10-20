@@ -1,23 +1,57 @@
 {% extends "base.html" %}
 
+{% load static %}
+{% load clinic_images %}
+
 {% block title %}Register — Care_Clinic{% endblock %}
 
 {% block content %}
-<section class="auth-panel">
-    <h1>Create your patient account</h1>
-    <p class="muted">
-        Registration is for <strong>patients only</strong>. Doctor, receptionist, and
-        administrator accounts are created by an administrator.
-    </p>
+{% section_image 'auth_register_panel' as register_photo %}
+<div class="container">
+    <div class="auth-split auth-split--register">
+        <aside class="auth-visual" aria-label="Care_Clinic illustration">
+            {% if register_photo %}
+            <figure class="auth-visual__media">
+                <img src="{{ register_photo.url }}"
+                     alt="{{ register_photo.alt }}"
+                     loading="eager">
+            </figure>
+            {% endif %}
+            <div class="auth-visual__scrim" aria-hidden="true"></div>
+            <div class="auth-visual__content">
+                <span class="eyebrow">Care_Clinic</span>
+                <p class="auth-visual__quote">One account for every visit — book, reschedule, and track your appointments.</p>
+                {% if register_photo and register_photo.caption %}
+                <p class="auth-visual__caption">{{ register_photo.caption }}</p>
+                {% elif not register_photo %}
+                <p class="auth-visual__caption">Illustrative stock photograph — not a Care_Clinic premises</p>
+                {% endif %}
+            </div>
+        </aside>
 
-    <form method="post" novalidate>
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">Register</button>
-    </form>
+        <section class="auth-card" aria-labelledby="register-heading">
+            <span class="section-rule" aria-hidden="true"></span>
+            <h1 id="register-heading">Create your patient account</h1>
+            <p class="muted">
+                Registration is for <strong>patients only</strong>. Doctor, receptionist, and
+                administrator accounts are created by an administrator.
+            </p>
 
-    <p class="auth-links">
-        Already have an account? <a href="{% url 'accounts:login' %}">Log in</a>.
-    </p>
-</section>
+            <form method="post" novalidate class="form">
+                {% csrf_token %}
+                {% include "partials/_form_errors.html" with form=form %}
+                {% for field in form %}
+                    {% include "partials/_field.html" with field=field %}
+                {% endfor %}
+                <div class="form-actions">
+                    <button type="submit" class="btn btn--primary btn--block">Create account</button>
+                </div>
+            </form>
+
+            <p class="auth-links">
+                <span>Already have an account? <a href="{% url 'accounts:login' %}">Log in</a></span>
+            </p>
+        </section>
+    </div>
+</div>
 {% endblock %}

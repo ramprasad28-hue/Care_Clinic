@@ -1,40 +1,64 @@
 {% extends "base.html" %}
-
+{% load static %}
+{% load clinic_images %}
 {% block title %}Doctor dashboard — Care_Clinic{% endblock %}
 
 {% block content %}
-<h1>Doctor dashboard</h1>
+<div class="container dashboard">
+    <div class="dashboard__head">
+        <span class="section-rule" aria-hidden="true"></span>
+        <span class="eyebrow">Your schedule</span>
+        <h1>Doctor dashboard</h1>
+        {% if doctor %}
+        <p>Dr. {{ doctor.user.get_full_name }} — your day, upcoming and past appointments.
+            Status actions apply to your own schedule only.</p>
+        {% else %}
+        <p>Your account has no doctor profile linked yet; see the notice below.</p>
+        {% endif %}
+    </div>
 
-{% if doctor %}
-    <p class="lead">
-        Dr. {{ user.get_full_name }} — {{ doctor.speciality.name }}
-        {% if not doctor.is_accepting_appointments %}<em>(not accepting appointments)</em>{% endif %}
-    </p>
+    {% if doctor %}
+        {% doctor_portrait doctor as portrait_url %}
+        <div class="dashboard__identity mb-4">
+            <span class="dashboard__avatar" aria-hidden="true">
+                {% if portrait_url %}
+                    <img src="{{ portrait_url }}" alt="" width="52" height="52" loading="lazy" decoding="async">
+                {% else %}
+                    {{ doctor.user.get_full_name|default:doctor.user.email|first|title }}
+                {% endif %}
+            </span>
+            <div class="cluster">
+                <span class="pill">{{ doctor.speciality.name }}</span>
+                {% if not doctor.is_accepting_appointments %}
+                    <span class="pill pill--neutral">Not accepting appointments</span>
+                {% else %}
+                    <span class="pill pill--neutral">Accepting appointments</span>
+                {% endif %}
+            </div>
+        </div>
 
-    <p class="filter-bar">
-        <a class="btn btn-secondary" href="{% url 'clinic:availability_list' %}">My availability</a>
-        <a class="btn btn-secondary" href="{% url 'clinic:leave_list' %}">My leave</a>
-        <a class="btn btn-secondary" href="{% url 'appointments:list' %}?scope=upcoming">All my appointments</a>
-    </p>
+        <div class="cluster mb-5">
+            <a class="btn btn--secondary" href="{% url 'clinic:availability_list' %}">My availability</a>
+            <a class="btn btn--secondary" href="{% url 'clinic:leave_list' %}">My leave</a>
+            <a class="btn btn--secondary" href="{% url 'appointments:list' %}?scope=upcoming">All my appointments</a>
+        </div>
 
-    <section>
-        <h2>Today ({% now "D j M Y" %})</h2>
-        {% include "dashboards/_appointment_table.html" with appointments=today show_actions=True %}
-    </section>
+        <section class="section" aria-labelledby="today-heading">
+            <h2 id="today-heading">Today ({% now "D j M Y" %})</h2>
+            {% include "dashboards/_appointment_table.html" with appointments=today show_actions=True hide_doctor=True empty_title="Nothing scheduled today" empty_text="Today's appointments appear as patients book an available time." %}
+        </section>
 
-    <section>
-        <h2>Upcoming</h2>
-        {% include "dashboards/_appointment_table.html" with appointments=upcoming show_actions=True %}
-    </section>
+        <section class="section" aria-labelledby="upcoming-heading">
+            <h2 id="upcoming-heading">Upcoming</h2>
+            {% include "dashboards/_appointment_table.html" with appointments=upcoming show_actions=True hide_doctor=True empty_title="No upcoming appointments" empty_text="Bookings for the coming days will appear here, generated from your availability rules." %}
+        </section>
 
-    <section>
-        <h2>Past</h2>
-        {% include "dashboards/_appointment_table.html" with appointments=past show_actions=True %}
-    </section>
-{% else %}
-    <p class="muted">
-        Your account has the Doctor role but no doctor profile is linked yet.
-        Please contact a clinic administrator.
-    </p>
-{% endif %}
+        <section class="section" aria-labelledby="past-heading">
+            <h2 id="past-heading">Past</h2>
+            {% include "dashboards/_appointment_table.html" with appointments=past show_actions=True hide_doctor=True empty_title="No past appointments" empty_text="Completed, cancelled and no-show visits are kept here as a record." %}
+        </section>
+    {% else %}
+        {% include "partials/_empty.html" with mark="!" title="No doctor profile" text="Your account has the Doctor role but no doctor profile is linked yet. Please contact a clinic administrator." %}
+    {% endif %}
+</div>
 {% endblock %}

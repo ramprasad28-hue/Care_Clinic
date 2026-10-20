@@ -1,4 +1,4 @@
-"""Tests for the public website (home, specialities, doctors)."""
+﻿"""Tests for the public website (home, specialities, doctors)."""
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -140,3 +140,551 @@ class DoctorDetailAvailabilityTests(TestCase):
         response = self.client.get(doctor.get_absolute_url())
         self.assertContains(response, "Monday")
         self.assertContains(response, "15 min")
+
+
+def make_user(email="user@example.com", role=User.Role.PATIENT, **kwargs):
+    return User.objects.create_user(
+        email=email, password="S3cret-pass!", role=role, **kwargs
+    )
+
+
+class SharedNavigationTests(TestCase):
+    """The shared site header/nav in ``templates/base.html`` (Phase 7.5, 11).
+
+    These lock the structural contract the CSS/JS rely on: landmarks, skip
+    link, the mobile-toggle wiring, role-aware links, and the POST logout.
+    """
+
+    def test_skip_link_and_main_landmark(self):
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, 'class="skip-link" href="#main-content"')
+        self.assertContains(response, "Skip to main content")
+        self.assertContains(response, 'id="main-content"')
+
+    def test_progressive_enhancement_hook(self):
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, 'class="no-js"')
+        self.assertContains(response, "classList.remove('no-js')")
+
+    def test_mobile_toggle_wiring(self):
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, 'type="button" class="nav-toggle"')
+        self.assertContains(response, 'aria-expanded="false"')
+        self.assertContains(response, 'aria-controls="site-nav"')
+        self.assertContains(response, 'id="site-nav"')
+        self.assertContains(response, 'aria-label="Primary"')
+
+    def test_primary_links_present_for_anonymous(self):
+        response = self.client.get(reverse("home"))
+        for name in ("speciality_list", "doctor_list", "accounts:login", "accounts:register"):
+            self.assertContains(response, reverse(name))
+        self.assertNotContains(response, reverse("dashboards:landing"))
+        self.assertNotContains(response, reverse("appointments:list"))
+
+    def test_active_link_uses_aria_current(self):
+        response = self.client.get(reverse("doctor_list"))
+        self.assertContains(response, 'aria-current="page"')
+
+    def test_patient_sees_account_links_but_not_clinic_or_admin(self):
+        self.client.force_login(make_user("p@example.com", User.Role.PATIENT))
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, reverse("dashboards:landing"))
+        self.assertContains(response, reverse("appointments:list"))
+        self.assertNotContains(response, "Django admin")
+        self.assertNotContains(response, reverse("clinic:availability_list"))
+        self.assertNotContains(response, reverse("clinic:leave_list"))
+
+    def test_doctor_sees_clinic_links(self):
+        self.client.force_login(make_user("d@example.com", User.Role.DOCTOR))
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, reverse("clinic:availability_list"))
+        self.assertContains(response, reverse("clinic:leave_list"))
+        self.assertNotContains(response, "Django admin")
+
+    def test_staff_sees_admin_link(self):
+        self.client.force_login(
+            make_user("a@example.com", User.Role.ADMIN, is_staff=True)
+        )
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, reverse("admin:index"))
+
+    def test_logout_is_a_post_form(self):
+        self.client.force_login(make_user("p@example.com", User.Role.PATIENT))
+        response = self.client.get(reverse("home"))
+        self.assertContains(
+            response, f'<form method="post" action="{reverse("accounts:logout")}"'
+        )
+        self.assertContains(response, "csrfmiddlewaretoken")
+
+
+
+# ==========================================================================
+# Phase C1 — admin-managed imagery (ADR-022)
+# ==========================================================================
+import io
+import tempfile
+
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.template import Context, Template
+from django.test import override_settings
+from django.urls import reverse
+from django.views.static import serve
+
+from website.image_validation import (
+    PORTRAIT_MIN_WIDTH,
+    SECTION_MIN_WIDTH,
+    max_upload_bytes,
+    validate_upload_image,
+)
+from website.models import (
+    SECTION_KEYS,
+    SECTION_STATIC_FALLBACKS,
+    WebsiteSectionImage,
+)
+
+#: A media root inside a temp dir — uploads never land on the repo or on
+#: other tests' media files (nothing outside this test run reads it).
+_TEMP_MEDIA_ROOT = tempfile.mkdtemp(prefix="c1-tests-media-")
+
+
+def png_bytes(width=1200, height=800, color=(20, 130, 140)):
+    """A real, decodable in-memory PNG (content, not just a filename)."""
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height), color).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def upload(name="image.png", data=None, content_type="image/png"):
+    return SimpleUploadedFile(name, png_bytes() if data is None else data, content_type)
+
+
+class UploadImageValidationTests(TestCase):
+    """Content-based validation shared by all three upload surfaces (ADR-022)."""
+
+    def test_max_bytes_setting_default(self):
+        self.assertEqual(max_upload_bytes(), 2 * 1024 * 1024)
+
+    def test_valid_png_passes(self):
+        validate_upload_image(upload("card.png"))
+
+    def test_valid_webp_passes(self):
+        from PIL import Image
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (900, 600), (10, 120, 130)).save(buffer, format="WEBP")
+        validate_upload_image(upload("card.webp", buffer.getvalue(), "image/webp"))
+
+    def test_valid_jpeg_passes(self):
+        from PIL import Image
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (900, 600)).save(buffer, format="JPEG")
+        validate_upload_image(upload("card.jpg", buffer.getvalue(), "image/jpeg"))
+
+    def test_unknown_extension_rejected(self):
+        with self.assertRaises(ValidationError):
+            validate_upload_image(upload("logo.svg"))
+
+    def test_wrong_content_with_image_extension_rejected(self):
+        faked = SimpleUploadedFile("card.png", b"definitely not an image", "image/png")
+        with self.assertRaises(ValidationError):
+            validate_upload_image(faked)
+
+    def test_decoded_but_unallowed_format_rejected(self):
+        from PIL import Image
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (400, 300)).save(buffer, format="GIF")
+        with self.assertRaises(ValidationError):
+            validate_upload_image(upload("card.png", buffer.getvalue(), "image/png"))
+
+    def test_size_cap_is_setting_driven(self):
+        with override_settings(UPLOAD_IMAGE_MAX_BYTES=10):
+            with self.assertRaises(ValidationError):
+                validate_upload_image(upload())  # valid PNG, exceeds the 10-byte cap
+
+    def test_no_file_bound_is_accepted(self):
+        self.assertEqual(validate_upload_image(None), [])
+
+    def test_narrow_section_image_warns_but_passes(self):
+        warnings = validate_upload_image(
+            upload("card.png", png_bytes(400, 400)),
+            warn_width=SECTION_MIN_WIDTH,
+            warn_ratio="3/2",
+        )
+        self.assertEqual(len(warnings), 2)  # width below minimum + ratio mismatch
+
+    def test_wide_ratio_matching_image_has_no_warning(self):
+        self.assertEqual(
+            validate_upload_image(upload("card.png", png_bytes(1200, 800)), warn_ratio="3/2"),
+            [],
+        )
+
+    def test_narrow_portrait_warns_but_passes(self):
+        warnings = validate_upload_image(
+            upload("profile.png", png_bytes(300, 600)), warn_width=PORTRAIT_MIN_WIDTH
+        )
+        self.assertEqual(len(warnings), 1)
+
+
+class WebsiteSectionImageModelTests(TestCase):
+    def test_str_and_defaults(self):
+        row = WebsiteSectionImage.objects.create(key="home_hero", name="Homepage hero")
+        self.assertEqual(str(row), "Homepage hero")
+        self.assertTrue(row.is_active)
+        self.assertFalse(bool(row.image))  # no file bound; filename stays empty
+
+    def test_section_keys_are_stable_and_mapped(self):
+        keys = {value for value, _label in SECTION_KEYS}
+        self.assertEqual(
+            keys,
+            {
+                "home_hero",
+                "home_about",
+                "auth_login_panel",
+                "auth_register_panel",
+                "doctors_listing_header",
+                "doctor_profile_photo_aside",
+                "specialities_mega_feature",
+                "doctors_mega_feature",
+            },
+        )
+        self.assertEqual(set(SECTION_STATIC_FALLBACKS), keys)
+        for fallback in SECTION_STATIC_FALLBACKS.values():
+            self.assertIn("static_path", fallback)
+
+    def test_active_for_skips_inactive_and_imageless_rows(self):
+        WebsiteSectionImage.objects.create(key="home_hero", name="Homepage hero")
+        self.assertIsNone(WebsiteSectionImage.objects.active_for("home_hero"))
+
+    def test_unknown_key_fails_validation(self):
+        row = WebsiteSectionImage(key="not_a_key", name="Nope")
+        with self.assertRaises(ValidationError):
+            row.save()
+
+
+class SectionImageTemplatetagTests(TestCase):
+    """``section_image`` resolution: upload → static fallback → None."""
+
+    def render(self, template_string, context=None):
+        return Template(template_string).render(Context(context or {}))
+
+    def test_unknown_key_fails_closed(self):
+        out = self.render("{% load clinic_images %}{% section_image 'not_a_key' as p %}{{ p }}")
+        self.assertEqual(out, "None")
+
+    def test_fallback_used_when_no_upload(self):
+        out = self.render("{% load clinic_images %}{% section_image 'home_hero' as p %}{{ p.url }}")
+        self.assertIn("/static/img/home/hero-main.jpg", out)
+
+    def test_fallback_flags_uploaded_false(self):
+        out = self.render(
+            "{% load clinic_images %}{% section_image 'auth_login_panel' as p %}"
+            "{{ p.uploaded }}|{{ p.caption }}"
+        )
+        self.assertEqual(out.split("|")[0], "False")
+        self.assertIn("Illustrative stock photograph", out)
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_uploaded_image_wins(self):
+        row = WebsiteSectionImage.objects.create(
+            key="home_hero", name="Homepage hero", image=upload()
+        )
+        out = self.render("{% load clinic_images %}{% section_image 'home_hero' as p %}{{ p.url }}")
+        self.assertIn("/media/", out)
+        self.assertIn(str(row.image.name), out)
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_inactive_row_falls_back_to_static(self):
+        WebsiteSectionImage.objects.create(
+            key="home_hero", name="Homepage hero", image=upload(), is_active=False
+        )
+        out = self.render("{% load clinic_images %}{% section_image 'home_hero' as p %}{{ p.url }}")
+        self.assertIn("/static/img/home/hero-main.jpg", out)
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_uploaded_alt_and_caption_override_defaults(self):
+        WebsiteSectionImage.objects.create(
+            key="home_about",
+            name="Homepage about band",
+            image=upload("band.png"),
+            alt_text="Uploaded alt for C1 verification",
+            caption="Uploaded caption for C1 verification",
+        )
+        out = self.render(
+            "{% load clinic_images %}{% section_image 'home_about' as p %}{{ p.alt }}|{{ p.caption }}"
+        )
+        self.assertIn("Uploaded alt for C1 verification", out)
+        self.assertIn("Uploaded caption for C1 verification", out)
+
+    def test_doctor_aside_caption_formats_the_doctor_name(self):
+        doctor = make_doctor(make_speciality("Aside Spec"), "aside@example.com")
+        out = self.render(
+            "{% load clinic_images %}"
+            "{% section_image 'doctor_profile_photo_aside' doctor=doctor as p %}{{ p.caption }}",
+            {"doctor": doctor},
+        )
+        self.assertIn("not a photograph of Dr. Doc Smith", out)
+
+
+class WebsiteSectionImageAdminTests(TestCase):
+    """Administrator-only access and working upload flows through the admin."""
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            email="root@example.com", password="S3cret-pass!"
+        )
+        self.admin = make_user("c1admin@example.com", User.Role.ADMIN, is_staff=True)
+
+    def tearDown(self):
+        for row in WebsiteSectionImage.objects.all():
+            try:
+                row.image.delete(save=False)
+            except (OSError, ValueError):
+                pass
+
+    def test_section_model_is_registered_in_admin(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(reverse("admin:index"))
+        self.assertContains(response, "Website section images")
+
+    def test_administrator_role_without_superuser_can_use_the_registry(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("admin:website_websitesectionimage_changelist"))
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(reverse("admin:website_websitesectionimage_add"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_plain_staff_cannot_reach_the_registry(self):
+        staff = make_user("plain@example.com", User.Role.PATIENT, is_staff=True)
+        self.client.force_login(staff)
+        response = self.client.get(reverse("admin:website_websitesectionimage_changelist"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_anonymous_is_redirected_to_login(self):
+        response = self.client.get(reverse("admin:website_websitesectionimage_changelist"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("admin:login"), response["Location"])
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_superuser_can_upload_a_section_image(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(reverse("admin:website_websitesectionimage_add"))
+        self.assertEqual(response.status_code, 200)
+        response = self.client.post(
+            reverse("admin:website_websitesectionimage_add"),
+            {
+                "key": "home_hero",
+                "name": "Homepage hero",
+                "image": upload("hero.png"),
+                "alt_text": "An illustrative clinic scene",
+                "caption": "Illustrative image used for C1 verification",
+                "is_active": "on",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        row = WebsiteSectionImage.objects.get(key="home_hero")
+        self.assertTrue(row.image)
+        # Uploads are scoped under MEDIA_ROOT and never near static/img.
+        self.assertTrue(str(row.image.name).startswith("sections/home_hero/"))
+        self.assertFalse(str(row.image.name).startswith("img/"))
+        # The change page re-renders with the file preview available.
+        response = self.client.get(
+            reverse("admin:website_websitesectionimage_change", args=[row.pk])
+        )
+        self.assertContains(response, str(row.image.url))
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_admin_rejects_invalid_upload_with_form_error(self):
+        self.client.force_login(self.superuser)
+        faked = SimpleUploadedFile("thing.png", b"not really an image", "image/png")
+        response = self.client.post(
+            reverse("admin:website_websitesectionimage_add"),
+            {"key": "home_about", "name": "Homepage about band", "image": faked},
+        )
+        self.assertEqual(response.status_code, 200)  # form re-rendered with errors
+        self.assertContains(response, "errorlist")
+        self.assertContains(response, "Upload a valid image")
+        self.assertEqual(WebsiteSectionImage.objects.count(), 0)
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_admin_size_limit_blocks_oversized_upload(self):
+        self.client.force_login(self.superuser)
+        with override_settings(UPLOAD_IMAGE_MAX_BYTES=10):
+            response = self.client.post(
+                reverse("admin:website_websitesectionimage_add"),
+                {"key": "home_about", "name": "Homepage about band", "image": upload()},
+            )
+        self.assertContains(response, "too large", status_code=200)
+        self.assertEqual(WebsiteSectionImage.objects.count(), 0)
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_speciality_admin_upload_saves_and_previews(self):
+        self.client.force_login(self.superuser)
+        speciality = make_speciality("Imagery Admin Spec")
+        add_url = reverse("admin:clinic_speciality_add")
+        response = self.client.get(add_url)
+        self.assertEqual(response.status_code, 200)
+        response = self.client.post(
+            add_url,
+            {
+                "name": "Imagery Admin Spec 2",
+                "slug": "imagery-admin-spec-2",
+                "description": "",
+                "image_caption": "Illustrative tile used for C1 verification",
+                "image": upload("card.png"),
+                "is_active": "on",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        spec = Speciality.objects.get(slug="imagery-admin-spec-2")
+        self.assertTrue(spec.image)
+        self.assertTrue(str(spec.image.name).startswith("specialities/"))
+        self.assertFalse(str(spec.image.name).startswith("img/"))
+        self.assertEqual(spec.image_caption, "Illustrative tile used for C1 verification")
+        response = self.client.get(
+            reverse("admin:clinic_speciality_change", args=[spec.pk])
+        )
+        self.assertContains(response, "Current image")
+        self.assertContains(response, str(spec.image.url))
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_doctor_admin_change_page_shows_portrait_preview(self):
+        self.client.force_login(self.superuser)
+        doctor = make_doctor(make_speciality("Portrait Admin Spec"), "portadm@example.com")
+        response = self.client.get(reverse("admin:clinic_doctor_change", args=[doctor.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Current portrait")
+        self.assertContains(response, "No portrait uploaded")
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_doctor_upload_path_never_enters_static(self):
+        doctor = make_doctor(make_speciality("Upload Path Spec"), "uppath@example.com")
+        doctor.profile_image = upload("portrait.png")
+        doctor.save()
+        self.assertTrue(str(doctor.profile_image.name).startswith("doctors/"))
+        self.assertFalse(str(doctor.profile_image.name).startswith("img/"))
+        doctor.profile_image.delete(save=False)
+
+
+class SectionImageMediaServingTests(TestCase):
+    """Development media serving is wired DEBUG-only in ``config/urls.py``.
+
+    The Django test runner forces DEBUG=False, so the two halves of this
+    contract are asserted by rebuilding ``config.urls`` under each mode.
+    """
+
+    def test_dev_setting_registers_media_route(self):
+        import importlib
+
+        import config.urls as root_urls
+
+        with override_settings(DEBUG=True):
+            importlib.reload(root_urls)
+            routes = [p for p in root_urls.urlpatterns if "media" in str(p.pattern)]
+        importlib.reload(root_urls)  # restore DEBUG=False wiring
+        self.assertTrue(routes)
+        self.assertIs(routes[0].callback, serve)
+
+    def test_prod_setting_registers_no_media_route(self):
+        # Django's test runner runs with DEBUG=False — production mode —
+        # so: no media route is registered at all.
+        import importlib
+
+        import config.urls as root_urls
+
+        importlib.reload(root_urls)
+        self.assertEqual(
+            [p for p in root_urls.urlpatterns if "media" in str(p.pattern)], []
+        )
+
+    def test_static_fallback_rendering_unchanged_without_uploads(self):
+        speciality = Speciality.objects.create(
+            name="Fallback Unchanged Spec", slug="cardiology"
+        )
+        response = self.client.get(reverse("speciality_detail", args=[speciality.slug]))
+        self.assertContains(response, "/static/img/specialities/cardiology-card.jpg")
+        self.assertContains(response, "Illustrative stock photo")
+
+
+class UploadedImageRenderingTests(TestCase):
+    """Fallback vs uploaded rendering over the real templates."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.doctor = make_doctor(make_speciality("Imagery Doc Spec"), "imdoc@example.com")
+
+    def test_home_uses_static_fallback_without_upload(self):
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, "/static/img/home/hero-main.jpg")
+        self.assertContains(response, "Illustrative stock photo")
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_home_uses_uploaded_hero_and_about_shot(self):
+        hero = WebsiteSectionImage.objects.create(
+            key="home_hero", name="Homepage hero", image=upload()
+        )
+        about = WebsiteSectionImage.objects.create(
+            key="home_about",
+            name="Homepage about band",
+            image=upload("band.png"),
+            caption="Uploaded about caption for C1 verification",
+        )
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, str(hero.image.name))
+        self.assertContains(response, str(about.image.name))
+        self.assertContains(response, "Uploaded about caption for C1 verification")
+        # The about band's static fallback honesty copy is gone for this section.
+        self.assertNotContains(response, "calm clinic consultation room")
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_speciality_upload_renders_with_caption_and_fallback_clears_exactly(self):
+        speciality = Speciality.objects.create(
+            name="Imagery Clear Fallback Spec", slug="cardiology"
+        )
+        speciality.image = upload("spec.png")
+        speciality.image_caption = "Illustrative imagery test upload"
+        speciality.save()
+        response = self.client.get(reverse("speciality_detail", args=[speciality.slug]))
+        self.assertContains(response, "/media/")
+        self.assertContains(response, "Illustrative imagery test upload")
+        # Removing the upload restores the documented static rendering.
+        speciality.image = None
+        speciality.save()
+        response = self.client.get(reverse("speciality_detail", args=[speciality.slug]))
+        self.assertContains(response, "/static/img/specialities/")
+        self.assertNotContains(response, "/media/")
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_doctor_portrait_upload_and_clearing(self):
+        self.doctor.profile_image = upload("portrait.png")
+        self.doctor.save()
+        response = self.client.get(reverse("doctor_detail", args=[self.doctor.slug]))
+        self.assertContains(response, "/media/")
+        self.assertContains(response, str(self.doctor.profile_image.name))
+        # The aside keeps its honesty caption, independent of the portrait.
+        self.assertContains(response, "not a photograph of Dr.")
+        self.doctor.profile_image = None
+        self.doctor.save()
+        response = self.client.get(reverse("doctor_detail", args=[self.doctor.slug]))
+        self.assertNotContains(response, "/media/")
+
+    @override_settings(MEDIA_ROOT=_TEMP_MEDIA_ROOT)
+    def test_login_and_register_panels_respect_section_uploads(self):
+        response = self.client.get(reverse("accounts:login"))
+        self.assertContains(response, "/static/img/home/hero-main.jpg")
+        row = WebsiteSectionImage.objects.create(
+            key="auth_login_panel", name="Login visual panel", image=upload("login.png")
+        )
+        response = self.client.get(reverse("accounts:login"))
+        # The login visual panel itself switched to the upload (the shared
+        # navigation's mega-image still denotes its own section).
+        self.assertContains(response, str(row.image.name))
+        response = self.client.get(reverse("accounts:register"))
+        # Register panel falls back to its own documented static image.
+        self.assertContains(response, "/static/img/about/waiting-area.jpg")

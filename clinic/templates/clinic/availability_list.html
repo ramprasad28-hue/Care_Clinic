@@ -3,33 +3,53 @@
 {% block title %}My availability — Care_Clinic{% endblock %}
 
 {% block content %}
-<h1>My weekly availability</h1>
-<p class="muted">Recurring windows from which bookable slots are generated.</p>
+<div class="container">
+    <div class="page-head">
+        <span class="section-rule" aria-hidden="true"></span>
+        <h1>My weekly availability</h1>
+        <p>Recurring windows from which bookable slots are generated. Inactive rules are kept for later but generate no slots.</p>
+    </div>
 
-<p><a class="btn btn-primary" href="{% url 'clinic:availability_add' %}">Add availability rule</a></p>
+    <p><a class="btn btn--primary" href="{% url 'clinic:availability_add' %}">Add availability rule</a></p>
 
-{% if rules %}
-    <table class="data-table">
-        <thead>
-            <tr><th>Day</th><th>Start</th><th>End</th><th>Slot length</th><th>Active</th><th>Actions</th></tr>
-        </thead>
-        <tbody>
-            {% for rule in rules %}
-                <tr>
-                    <td>{{ rule.get_weekday_display }}</td>
-                    <td>{{ rule.start_time|time:"H:i" }}</td>
-                    <td>{{ rule.end_time|time:"H:i" }}</td>
-                    <td>{{ rule.effective_slot_length_minutes }} min</td>
-                    <td>{% if rule.is_active %}Yes{% else %}No{% endif %}</td>
-                    <td class="row-actions">
-                        <a href="{% url 'clinic:availability_edit' rule.pk %}">Edit</a>
-                        <a class="danger" href="{% url 'clinic:availability_delete' rule.pk %}">Delete</a>
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <p class="muted">You have no availability rules yet.</p>
-{% endif %}
+    {% if rules %}
+        <div class="table-wrap table-wrap--stack" tabindex="0" role="region" aria-label="Availability rules">
+            <table class="data-table">
+                <thead>
+                    <tr><th scope="col">Day</th><th scope="col">Start</th><th scope="col">End</th><th scope="col">Slot length</th><th scope="col">State</th><th scope="col">Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for rule in rules %}
+                        <tr>
+                            <td data-label="Day" class="day-cell">{{ rule.get_weekday_display }}</td>
+                            <td data-label="Start" class="num">{{ rule.start_time|time:"H:i" }}</td>
+                            <td data-label="End" class="num">{{ rule.end_time|time:"H:i" }}</td>
+                            <td data-label="Slot length">{{ rule.effective_slot_length_minutes }} min</td>
+                            <td data-label="State">
+                                {% if rule.is_active %}
+                                    <span class="badge status-confirmed"><span class="badge__dot" aria-hidden="true"></span>Active</span>
+                                {% else %}
+                                    <span class="badge status-no_show"><span class="badge__dot" aria-hidden="true"></span>Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Actions">
+                                <div class="row-actions">
+                                    <a class="btn btn--ghost btn--sm" href="{% url 'clinic:availability_edit' rule.pk %}">Edit</a>
+                                    <a class="btn btn--ghost btn--sm" href="{% url 'clinic:availability_delete' rule.pk %}">Delete</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="table-footnote">Bookable slots are generated from these windows for patients to pick.</p>
+    {% else %}
+        <div class="empty">
+            <h2>No availability rules yet</h2>
+            <p>Patients can only book inside your weekly windows. Add a rule to start offering appointment slots.</p>
+            <p><a class="btn btn--primary" href="{% url 'clinic:availability_add' %}">Add your first rule</a></p>
+        </div>
+    {% endif %}
+</div>
 {% endblock %}

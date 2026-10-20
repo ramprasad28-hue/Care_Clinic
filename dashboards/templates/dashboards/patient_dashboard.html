@@ -1,23 +1,31 @@
 {% extends "base.html" %}
-
 {% block title %}Patient dashboard — Care_Clinic{% endblock %}
 
 {% block content %}
-<h1>Patient dashboard</h1>
-<p class="lead">Welcome, {{ user.get_full_name }}.</p>
+<div class="container dashboard">
+    <div class="dashboard__head">
+        <span class="section-rule" aria-hidden="true"></span>
+        <span class="eyebrow">Your visits</span>
+        <h1>Patient dashboard</h1>
+        <p>Hello{% if user.get_full_name %}, {{ user.get_full_name }}{% else %}{{ user.email }}{% endif %}.
+            Your upcoming visits are listed first; open a reference number for the full
+            details, cancellation or rescheduling options.</p>
+    </div>
 
-<p class="filter-bar">
-    <a class="btn btn-primary" href="{% url 'doctor_list' %}">Book an appointment</a>
-    <a class="btn btn-secondary" href="{% url 'appointments:list' %}">All my appointments</a>
-</p>
+    <div class="cluster mb-5">
+        <a class="btn btn--primary" href="{% url 'doctor_list' %}">Book an appointment</a>
+        <a class="btn btn--secondary" href="{% url 'appointments:list' %}">All my appointments</a>
+    </div>
 
-<section>
-    <h2>Upcoming appointments</h2>
-    {% include "dashboards/_appointment_table.html" with appointments=upcoming show_actions=False %}
-</section>
+    {% url 'doctor_list' as book_url %}
+    <section class="section" aria-labelledby="upcoming-heading">
+        <h2 id="upcoming-heading">Upcoming appointments</h2>
+        {% include "dashboards/_appointment_table.html" with appointments=upcoming show_actions=False hide_patient=True empty_title="No upcoming appointments" empty_text="When you book a visit it will appear here. Start from the doctors list, then pick a date and an open time." empty_action_url=book_url empty_action_label="Book an appointment" %}
+    </section>
 
-<section>
-    <h2>Past appointments</h2>
-    {% include "dashboards/_appointment_table.html" with appointments=history show_actions=False %}
-</section>
+    <section class="section" aria-labelledby="history-heading">
+        <h2 id="history-heading">Past appointments</h2>
+        {% include "dashboards/_appointment_table.html" with appointments=history show_actions=False hide_patient=True empty_title="No past appointments" empty_text="Completed and cancelled past visits are kept here as a record; see 'All my appointments' for the full list." %}
+    </section>
+</div>
 {% endblock %}

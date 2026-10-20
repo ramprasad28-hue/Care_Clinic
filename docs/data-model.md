@@ -71,6 +71,8 @@ erDiagram
 | `slug` | unique, indexed | URL key, ASCII, auto from name |
 | `description` | text | public copy |
 | `is_active` | bool | hidden when false |
+| `image` | image, nullable | admin-managed tile/hero upload (ADR-022, C1); `media/specialities/<slug>/card.<ext>` |
+| `image_caption` | varchar(255), blank | honest caption shown with the uploaded image |
 | `created_at`, `updated_at` | datetime | audit |
 
 ### 3.4 `clinic.Doctor`
@@ -82,7 +84,8 @@ erDiagram
 | `registration_number` | varchar(50), unique | credentials |
 | `qualification` | varchar(120) | e.g. "MBBS, MD" |
 | `bio` | text | public |
-| `profile_image` | image, nullable | optional |
+| `profile_image` | image, nullable | admin-managed portrait (ADR-022, C1); `media/doctors/<slug>/profile.<ext>` |
+| `profile_image_caption` | varchar(255), blank | honest caption shown with the uploaded portrait |
 | `slot_length_minutes` | int, default 30 | per-doctor override (Q11) |
 | `is_accepting_appointments` | bool, default True | operational switch |
 | `created_at`, `updated_at` | datetime | audit |
@@ -173,6 +176,25 @@ management command or lazily on demand).
 
 - `notifications.Notification` — in-app messages (user FK, message, is_read).
 - `appointments.AppointmentStatusHistory` — append-only audit of status transitions.
+
+### 3.10 `website.WebsiteSectionImage` (ADR-022, C1)
+
+One admin-managed registry row per stable website section (homepage hero, about band, auth
+panels, listing headers, doctor-profile aside, mega-menu features — the 8 `SECTION_KEYS`).
+
+| Field | Type | Notes |
+|---|---|---|
+| `key` | slug, unique, choices=`SECTION_KEYS` | stable section identifier (never content-derived) |
+| `name` | varchar(120), unique | human-readable label for the admin |
+| `image` | image, nullable | `media/sections/<key>/image.<ext>` — never touches `static/` |
+| `alt_text` | varchar(255), blank | text alternative for the upload |
+| `caption` | varchar(255), blank | replaces the template's default honesty caption |
+| `is_active` | bool, default True | deactivates the row so its section reverts to the static fallback |
+| `updated_at` | datetime | audit |
+
+**Invariants:** `save()` runs `full_clean()`, so an unknown key can never slip past a raw ORM
+insert; resolution order per section is upload → existing static fallback file → nothing
+(fails closed). See `docs/imagery-licensing.md` for the honesty rules applying to uploads.
 
 ## 4. Appointment status state machine
 

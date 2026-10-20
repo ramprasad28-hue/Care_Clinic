@@ -3,9 +3,12 @@
 {% block title %}Logged out — Care_Clinic{% endblock %}
 
 {% block content %}
-<section class="auth-panel">
-    <h1>You have been logged out</h1>
-    <p>Thanks for visiting Care_Clinic.</p>
-    <p class="auth-links"><a href="{% url 'accounts:login' %}">Log in again</a></p>
-</section>
+<div class="container container--form">
+    <section class="auth-panel" aria-labelledby="logged-out-heading">
+        <span class="section-rule" aria-hidden="true"></span>
+        <h1 id="logged-out-heading">You have been logged out</h1>
+        <p>Thanks for visiting Care_Clinic. Your session has ended on this device.</p>
+        <div class="auth-actions"><a class="btn btn--primary btn--block" href="{% url 'accounts:login' %}">Log in again</a></div>
+    </section>
+</div>
 {% endblock %}
