@@ -12,6 +12,7 @@ Authorization model:
 """
 from datetime import datetime
 
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
@@ -110,6 +111,7 @@ class BookAppointmentView(RoleRequiredMixin, View):
 class AppointmentListView(LoginRequiredMixin, ListView):
     template_name = "appointments/appointment_list.html"
     context_object_name = "appointments"
+    paginate_by = 10
 
     def get_scope(self):
         return self.request.GET.get("scope", "upcoming")
@@ -125,6 +127,11 @@ class AppointmentListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Build querystring preserving existing filters (scope).
+        qs_params = self.request.GET.copy()
+        # Remove 'page' if it exists so we can re-add it cleanly.
+        qs_params.pop("page", None)
+        context["querystring"] = qs_params.urlencode() if qs_params else ""
         context["scope"] = self.get_scope()
         return context
 

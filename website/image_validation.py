@@ -77,6 +77,17 @@ def validate_upload_image(
             )
         )
 
+    # --- SIZE CAP: check BEFORE reading/decoding to avoid loading large files
+    # into memory or invoking Pillow when the file already exceeds the limit.
+    try:
+        size = image_field_file.size
+    except (AttributeError, OSError):  # pragma: no cover - defensive
+        size = None
+    if size and size > max_upload_bytes():
+        raise ValidationError(
+            _("Image is too large (max %(max)s MB).") % {"max": round(max_upload_bytes() / (1024 * 1024))}
+        )
+
     try:
         image_field_file.seek(0)
     except (OSError, AttributeError):
@@ -101,6 +112,10 @@ def validate_upload_image(
         except (OSError, AttributeError):
             pass
 
+    # Re-check size after decode for the case where size was not available
+    # before (e.g. some file-like objects report size only after seek/read).
+    # This ensures the cap is always enforced, even when the initial size
+    # was unknown.
     try:
         size = image_field_file.size
     except (AttributeError, OSError):  # pragma: no cover - defensive

@@ -22,27 +22,43 @@
         {% endif %}
     </div>
 
-    {% if appointments %}
-        {% include "dashboards/_appointment_table.html" with appointments=appointments show_actions=False %}
-    {% elif scope == 'past' and user.is_patient %}
-        <div class="empty">
-            <h2>No past appointments yet</h2>
-            <p>Once you have attended visits, they will be listed here for your history.</p>
-        </div>
-    {% elif scope == 'past' %}
-        <div class="empty">
-            <h2>No past appointments to show</h2>
-        </div>
-    {% elif user.is_patient %}
-        <div class="empty">
-            <h2>No upcoming appointments</h2>
-            <p>You have nothing booked right now. Browse the doctors list to pick a time that suits you.</p>
-            <p><a class="btn btn--primary" href="{% url 'doctor_list' %}">Choose a doctor</a></p>
-        </div>
-    {% else %}
-        <div class="empty">
-            <h2>No upcoming appointments</h2>
-        </div>
+    <div class="cluster mb-5">
+        {% if appointments %}
+            {% include "dashboards/_appointment_table.html" with appointments=appointments show_actions=False %}
+        {% elif scope == 'past' and user.is_patient %}
+            <div class="empty">
+                <h2>No past appointments yet</h2>
+                <p>Once you have attended visits, they will be listed here for your history.</p>
+            </div>
+        {% elif scope == 'past' %}
+            <div class="empty">
+                <h2>No past appointments to show</h2>
+            </div>
+        {% elif user.is_patient %}
+            <div class="empty">
+                <h2>No upcoming appointments</h2>
+                <p>You have nothing booked right now. Browse the doctors list to pick a time that suits you.</p>
+                <p><a class="btn btn--primary" href="{% url 'doctor_list' %}">Choose a doctor</a></p>
+            </div>
+        {% else %}
+            <div class="empty">
+                <h2>No upcoming appointments</h2>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if is_paginated %}
+    <nav class="mt-4" aria-label="Pagination">
+        {% if page_obj.has_previous %}
+            <a class="btn btn--secondary" rel="prev"
+               href="{% querystring page=page_obj.previous_page_number }">Previous</a>
+        {% endif %}
+        <span class="pagination__status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a class="btn btn--secondary" rel="next"
+               href="{% querystring page=page_obj.next_page_number }">Next</a>
+        {% endif %}
+    </nav>
     {% endif %}
 </div>
 {% endblock %}

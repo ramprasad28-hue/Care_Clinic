@@ -212,12 +212,10 @@ class ReceptionistDashboardView(_FilteredAppointmentDashboard):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = timezone.localdate()
-        context["today_count"] = (
-            Appointment.objects.filter(date=today).count()
-        )
-        context["upcoming_count"] = (
-            Appointment.objects.filter(date__gte=today).count()
-        )
+        user = self.request.user
+        base = Appointment.objects.for_user(user)
+        context["today_count"] = base.filter(date=today).count()
+        context["upcoming_count"] = base.filter(date__gte=today).count()
         return context
 
 
@@ -331,8 +329,10 @@ class AdminDashboardView(RoleRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         request = self.request
         today = timezone.localdate()
+        user = request.user
+        base = Appointment.objects.for_user(user)
 
-        aggregate = Appointment.objects.aggregate(
+        aggregate = base.aggregate(
             total=Count("id"),
             today=Count("id", filter=Q(date=today)),
             upcoming=Count("id", filter=Q(date__gte=today)),
@@ -341,7 +341,7 @@ class AdminDashboardView(RoleRequiredMixin, TemplateView):
         )
         by_status = {
             row["status"]: row["count"]
-            for row in Appointment.objects.values("status").annotate(count=Count("id"))
+            for row in base.values("status").annotate(count=Count("id"))
         }
         status_breakdown = [
             {

@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -319,14 +319,18 @@ class Appointment(models.Model):
             self.full_clean()
             super().save(*args, **kwargs)
             return
-        # First insert: use a unique temporary reference, obtain the PK, then
-        # replace it with the final PK-derived reference (race-free because the
-        # PK is unique).
-        self.reference = f"TMP-{uuid.uuid4().hex[:12]}"
-        self.full_clean()
-        super().save(*args, **kwargs)
-        self.reference = self._build_reference()
-        super().save(update_fields=["reference"])
+        # Use the database the model is currently associated with.
+        using = self._state.db or "default"
+        with transaction.atomic(using=using):
+            # First insert: use a unique temporary reference, obtain the PK, then
+            # replace it with the final PK-derived reference (the entire block is
+            # atomic so a failure does not leave a persisted appointment with a TMP
+            # reference).
+            self.reference = f"TMP-{uuid.uuid4().hex[:12]}"
+            self.full_clean()
+            super().save(*args, **kwargs)
+            self.reference = self._build_reference()
+            super().save(update_fields=["reference"])
 
     def get_absolute_url(self):
         return reverse("appointments:detail", kwargs={"reference": self.reference})

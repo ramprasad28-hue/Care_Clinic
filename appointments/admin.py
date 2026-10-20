@@ -66,5 +66,27 @@ class AppointmentAdmin(AdministratorOnlyMixin, admin.ModelAdmin):
     date_hierarchy = "date"
     ordering = ("-date", "-start_time")
     list_select_related = ("patient", "doctor", "doctor__user", "slot")
-    readonly_fields = ("reference", "created_at", "updated_at")
+    readonly_fields = ("reference", "created_at", "updated_at", "status")
     autocomplete_fields = ("patient", "doctor", "slot", "booked_by", "cancelled_by")
+
+    def has_delete_permission(self, request, obj=None):
+        # Disable deleting Appointment records through Django Admin for all
+        # admin users, including bulk deletion. Preserve appointment history;
+        # the supported ways to release or change a booking are the existing
+        # cancellation and rescheduling workflows.
+        return False
+
+    def delete_view(self, request, object_id, extra_context=None):
+        # Deny the delete operation and show a message that cancellation
+        # and rescheduling are the supported ways to release or change a booking.
+        from django.contrib import messages
+        messages.error(
+            request,
+            "Deleting appointments is not permitted. "
+            "Use the application's cancellation or rescheduling workflow "
+            "to release or change a booking.",
+        )
+        # Redirect to the admin change page for this appointment
+        from django.shortcuts import reverse
+        from django.http import HttpResponseRedirect
+        return HttpResponseRedirect(reverse("admin:appointments_appointment_change", args=(object_id,)))
