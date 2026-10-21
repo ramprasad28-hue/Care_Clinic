@@ -36,3 +36,6 @@ coverage>=7.4,<8.0
 # --- Security tooling (optional, dev only) ---
 bandit>=1.7,<2.0
 pip-audit>=2.7,<3.0
+
+gunicorn>=26.2,<27
+whitenoise>=6.12,<7

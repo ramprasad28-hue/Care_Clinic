@@ -10,6 +10,16 @@ from .base import ALLOWED_HOSTS, SECRET_KEY  # noqa: F401
 
 DEBUG = False
 
+# --- Production static files ---
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
 if not SECRET_KEY:
     raise ImproperlyConfigured(
         "DJANGO_SECRET_KEY must be set in the environment for production."
