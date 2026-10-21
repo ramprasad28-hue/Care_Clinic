@@ -6,6 +6,8 @@ from . import views
 
 urlpatterns = [
     path("", views.HomeView.as_view(), name="home"),
+    path("contact/", views.ContactView.as_view(), name="contact"),
+    path("faq/", views.FaqView.as_view(), name="faq"),
     path("specialities/", views.SpecialityListView.as_view(), name="speciality_list"),
     path(
         "specialities/<slug:slug>/",

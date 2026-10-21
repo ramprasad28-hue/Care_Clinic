@@ -22,6 +22,16 @@ class HomeView(TemplateView):
         return context
 
 
+class ContactView(TemplateView):
+    """Public contact/help page. Static content only — no forms, no models."""
+    template_name = "website/contact.html"
+
+
+class FaqView(TemplateView):
+    """Public FAQ page. Static content describing actual app behavior."""
+    template_name = "website/faq.html"
+
+
 class SpecialityListView(ListView):
     template_name = "website/speciality_list.html"
     context_object_name = "specialities"

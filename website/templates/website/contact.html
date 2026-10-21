@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Contact — Care_Clinic{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head">
+        <span class="section-rule" aria-hidden="true"></span>
+        <span class="eyebrow">Contact</span>
+        <h1>Getting in touch</h1>
+        <p>Appointments at Care_Clinic are arranged online. Here is how to get
+        started, and where the clinic's own contact details will appear once
+        they are published.</p>
+    </div>
+</div>
+
+<section class="band" aria-labelledby="contact-online-heading">
+    <div class="container">
+        <div class="band__head">
+            <span class="section-rule" aria-hidden="true"></span>
+            <h2 class="section-title" id="contact-online-heading">Everything happens online</h2>
+            <p class="section-intro">
+                Booking, rescheduling, and cancellation are all self-service, so
+                the fastest route to a visit is the website itself.
+            </p>
+        </div>
+
+        <div class="grid grid--two">
+            <ul class="stack">
+                <li>
+                    <h3>Book an appointment</h3>
+                    <p>Open the <a href="{% url 'doctor_list' %}">doctors list</a>,
+                    pick a speciality, and choose an open time. No account is
+                    needed to browse, but you will need one to confirm a
+                    booking.</p>
+                </li>
+                <li>
+                    <h3>Create an account</h3>
+                    <p>
+                        <a href="{% url 'accounts:register' %}">Patient
+                        registration</a> takes an email address and a password.
+                    </p>
+                </li>
+                <li>
+                    <h3>Manage a booking</h3>
+                    <p>Once you are signed in, your
+                        <a href="{% url 'appointments:list' %}">appointments
+                        list</a> and
+                        <a href="{% url 'dashboards:landing' %}">dashboard</a>
+                        let you view, reschedule, or cancel your visits.</p>
+                </li>
+                <li>
+                    <h3>Trouble signing in</h3>
+                    <p>
+                        <a href="{% url 'accounts:password_reset' %}">Reset your
+                        password</a> using your registered email address.
+                    </p>
+                </li>
+            </ul>
+
+            <div>
+                <div class="notice" role="note">
+                    <p><strong>Clinic contact details are not published yet.</strong>
+                    The clinic's address, phone number, support email, and
+                    opening hours will appear here as soon as they are provided
+                    and verified. They are deliberately left blank rather than
+                    filled with placeholder details.</p>
+                </div>
+                {% include "partials/_empty.html" with mark="+" title="Reception details pending" text="Waiting on the clinic to supply: physical address, phone number, support email, and opening hours." %}
+                {% if user.is_authenticated %}
+                    <p class="muted">Signed in as {{ user.email }} — you can
+                    manage your bookings directly from your
+                    <a href="{% url 'dashboards:landing' %}">dashboard</a>.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="band band--tint" aria-labelledby="contact-help-heading">
+    <div class="container">
+        <div class="band__head">
+            <span class="section-rule" aria-hidden="true"></span>
+            <h2 class="section-title" id="contact-help-heading">Need help with an existing appointment?</h2>
+            <p class="section-intro">
+                Every appointment has a reference like <code>CC-2026-000123</code>.
+                Keep it handy — it identifies your booking exactly when you ask
+                about changes. See the <a href="{% url 'faq' %}">frequently asked
+                questions</a> for cancellation windows and common questions.
+            </p>
+        </div>
+    </div>
+</section>
+{% endblock %}

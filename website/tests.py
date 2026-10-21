@@ -1,7 +1,7 @@
 ﻿"""Tests for the public website (home, specialities, doctors)."""
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.urls import reverse
+from django.urls import resolve, reverse
 
 from clinic.models import AvailabilityRule, Doctor, Speciality, Weekday
 
@@ -780,3 +780,98 @@ class UploadedImageRenderingTests(TestCase):
         response = self.client.get(reverse("accounts:register"))
         # Register panel falls back to its own documented static image.
         self.assertContains(response, "/static/img/about/waiting-area.jpg")
+
+
+class ContactPageTests(TestCase):
+    """Public /contact/ page: static template, no models, no form."""
+
+    def test_contact_ok_for_anonymous(self):
+        response = self.client.get(reverse("contact"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_contact_uses_correct_template(self):
+        response = self.client.get(reverse("contact"))
+        self.assertTemplateUsed(response, "website/contact.html")
+        self.assertTemplateUsed(response, "base.html")
+
+    def test_contact_page_title_headings_and_content(self):
+        response = self.client.get(reverse("contact"))
+        self.assertContains(response, "<title>Contact — Care_Clinic</title>")
+        self.assertContains(response, "<h1>")
+        self.assertContains(response, "Book an appointment")
+
+    def test_contact_links_resolve(self):
+        response = self.client.get(reverse("contact"))
+        content = response.content.decode()
+        self.assertIn(reverse("doctor_list"), content)
+        self.assertIn(reverse("faq"), content)
+
+    def test_contact_footer_links_resolve(self):
+        response = self.client.get(reverse("contact"))
+        content = response.content.decode()
+        self.assertIn('href="/contact/"', content)
+        self.assertIn('href="/faq/"', content)
+
+    def test_contact_visible_when_signed_in(self):
+        User.objects.create_user(
+            email="signedin@example.com",
+            password="S3cret-pass!",
+            role=User.Role.PATIENT,
+        )
+        self.client.force_login(User.objects.get(email="signedin@example.com"))
+        self.assertEqual(self.client.get(reverse("contact")).status_code, 200)
+
+    def test_contact_no_form_posted(self):
+        response = self.client.get(reverse("contact"))
+        self.assertNotContains(response, "<form")
+
+
+class FaqPageTests(TestCase):
+    """Public /faq/ page: static template, answers mirror actual behavior."""
+
+    def test_faq_ok_for_anonymous(self):
+        response = self.client.get(reverse("faq"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_faq_uses_correct_template(self):
+        response = self.client.get(reverse("faq"))
+        self.assertTemplateUsed(response, "website/faq.html")
+        self.assertTemplateUsed(response, "base.html")
+
+    def test_faq_page_title_and_headings(self):
+        response = self.client.get(reverse("faq"))
+        self.assertContains(response, "<title>FAQ — Care_Clinic</title>")
+        self.assertContains(response, "<h1>Frequently asked questions</h1>")
+
+    def test_faq_answers_match_actual_behavior(self):
+        response = self.client.get(reverse("faq"))
+        content = response.content.decode()
+        self.assertIn("CC-2026-000123", content)  # real reference format
+        self.assertIn("24 hours", content)  # CANCELLATION_WINDOW = 24 h
+        self.assertContains(response, "password")
+
+    def test_faq_resolves_named_route(self):
+        self.assertEqual(reverse("faq"), "/faq/")
+
+    def test_faq_visible_when_signed_in(self):
+        user = User.objects.create_user(
+            email="faquser@example.com",
+            password="S3cret-pass!",
+            role=User.Role.PATIENT,
+        )
+        self.client.force_login(user)
+        self.assertEqual(self.client.get(reverse("faq")).status_code, 200)
+
+
+class ContactFaqNavigationTests(TestCase):
+    """Links to the new pages resolve and only add lightweight routes."""
+
+    def test_base_footer_has_contact_and_faq(self):
+        response = self.client.get(reverse("home"))
+        content = response.content.decode()
+        self.assertIn('href="/contact/"', content)
+        self.assertIn('href="/faq/"', content)
+
+    def test_urls_resolve_to_expected_views(self):
+        self.assertEqual(resolve("/contact/").view_name, "contact")
+        self.assertEqual(resolve("/faq/").view_name, "faq")

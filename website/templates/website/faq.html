@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}FAQ — Care_Clinic{% endblock %}
+
+{% block content %}
+<div class="container container--narrow">
+    <div class="page-head">
+        <span class="section-rule" aria-hidden="true"></span>
+        <span class="eyebrow">FAQ</span>
+        <h1>Frequently asked questions</h1>
+        <p>Short answers about how Care_Clinic works — registration, booking,
+        and what happens when plans change.</p>
+    </div>
+</div>
+
+<section class="band" aria-labelledby="faq-start-heading">
+    <div class="container container--narrow">
+        <h2 id="faq-start-heading">Getting started</h2>
+        <div class="stack">
+            <h3>How do I create a patient account?</h3>
+            <p>Use the <a href="{% url 'accounts:register' %}">registration
+            page</a> with your email address and a password of your choosing.
+            Everything you book is tied to that account.</p>
+
+            <h3>How do I find the right doctor?</h3>
+            <p>Browse by <a href="{% url 'speciality_list' %}">speciality</a> or
+            look through the <a href="{% url 'doctor_list' %}">full doctor
+            list</a>. Only active specialities and doctors currently accepting
+            appointments are shown, so everyone you see can be booked.</p>
+        </div>
+    </div>
+</section>
+
+<section class="band band--tint" aria-labelledby="faq-booking-heading">
+    <div class="container container--narrow">
+        <h2 id="faq-booking-heading">Booking an appointment</h2>
+        <div class="stack">
+            <h3>How do I book?</h3>
+            <p>Choose a speciality, pick a doctor, and select an open time from
+            their weekly availability. Confirm the booking and you are done —
+            no account is required just to see the schedule, but you sign in to
+            confirm a visit.</p>
+
+            <h3>Are the times shown genuine availability?</h3>
+            <p>Yes. Every open time is generated directly from the doctor's own
+            weekly schedule. A slot disappears the moment someone books it, so
+            two patients can never take the same time.</p>
+
+            <h3>What is my appointment reference?</h3>
+            <p>When you book, the appointment gets a reference in the form
+            <code>CC-2026-000123</code>. Keep it — it identifies your booking
+            exactly. You can always find it again in your
+            <a href="{% url 'appointments:list' %}">appointments list</a>.</p>
+
+            <h3>Can I book with more than one doctor?</h3>
+            <p>Yes. You can book appointments with different doctors, or with
+            the same doctor at different times. The only limit is that a single
+            time slot belongs to one patient at a time.</p>
+        </div>
+    </div>
+</section>
+
+<section class="band" aria-labelledby="faq-changes-heading">
+    <div class="container container--narrow">
+        <h2 id="faq-changes-heading">Changing your plans</h2>
+        <div class="stack">
+            <h3>Can I cancel an appointment?</h3>
+            <p>Yes — you can cancel yourself until 24 hours before the
+            appointment starts. After that, changes go through the clinic
+            instead. Cancelling never deletes your record: the booking history
+            is kept, and the time immediately opens up for other patients.</p>
+
+            <h3>Can I reschedule instead?</h3>
+            <p>Yes, within the same 24-hour window. Pick any open slot as the
+            replacement; your original booking stays exactly as it is unless
+            the new one is confirmed successfully.</p>
+        </div>
+    </div>
+</section>
+
+<section class="band band--tint" aria-labelledby="faq-account-heading">
+    <div class="container container--narrow">
+        <h2 id="faq-account-heading">Your account</h2>
+        <div class="stack">
+            <h3>I forgot my password. What now?</h3>
+            <p>Use the <a href="{% url 'accounts:password_reset' %}">password
+            reset page</a> and enter the email address on your account. Follow
+            the instructions you receive to choose a new password.</p>
+        </div>
+    </div>
+</section>
+
+<section class="band" aria-labelledby="faq-safety-heading">
+    <div class="container container--narrow">
+        <h2 id="faq-safety-heading">Important</h2>
+        <p>Care_Clinic arranges routine appointments only. If this is a medical
+        emergency, do not use this website — contact your local emergency
+        services or emergency care provider immediately.</p>
+    </div>
+</section>
+{% endblock %}
