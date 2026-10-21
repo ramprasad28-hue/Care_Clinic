@@ -120,10 +120,28 @@ Copy-Item .env.example .env
 | `DATABASE_PASSWORD` | Database password |
 | `DATABASE_HOST` | Database host (default `127.0.0.1`) |
 | `DATABASE_PORT` | Database port (default `3306`) |
+| `DATABASE_SSL_CA` | *Optional* CA bundle path for **remote** MySQL TLS — sets `ssl_mode=VERIFY_IDENTITY`, so the certificate chain **and hostname** are verified (see `docs/mysql-validation.md` §6). Leave empty locally |
+| `EMAIL_BACKEND` | *Optional* `django.core.mail.backends.smtp.EmailBackend` (default); development overrides to the console backend |
+| `EMAIL_HOST` / `EMAIL_PORT` | SMTP server (provider-specific — supply at deployment) |
+| `EMAIL_HOST_USER` / `EMAIL_HOST_PASSWORD` | SMTP credentials — environment only, never committed |
+| `EMAIL_USE_TLS` / `EMAIL_USE_SSL` | Mutually exclusive SMTP encryption switches — set **only one** |
+| `EMAIL_TIMEOUT` | *Optional* SMTP timeout in seconds |
+| `DEFAULT_FROM_EMAIL` | Sender address — also provider-specific, supplied at deployment |
 
 **Settings modules:** `config.settings.development` (default, `manage.py`) and
 `config.settings.production` (enforces a real `DJANGO_SECRET_KEY` and `DJANGO_ALLOWED_HOSTS`
 and turns on HTTPS/HSTS/secure cookies). `wsgi.py`/`asgi.py` default to production.
+
+**Email:** local development prints password-reset emails to the console (`EMAIL_BACKEND`
+always overridden); nothing is sent. In production the SMTP values above configure the
+connection — the **provider details (host, credentials, sender) must be supplied during
+deployment**; none are preselected and delivery should not be assumed to work until a real
+provider is configured and tested. Real credentials live in the environment only and must
+never be committed anywhere (this table included).
+
+**Database TLS:** see `docs/mysql-validation.md` §6 — a remote MySQL server requires
+TLS (`DATABASE_SSL_CA`): the connection uses `ssl_mode=VERIFY_IDENTITY` (encrypted,
+certificate verified against the CA, hostname verified); local setups leave it empty.
 
 ### 4. Database creation and connection
 
@@ -298,6 +316,14 @@ pytest                             # pytest-django (config in pytest.ini)
 
 The MySQL-only concurrency test is skipped on SQLite; see
 [`docs/mysql-validation.md`](docs/mysql-validation.md) for the exact MySQL/InnoDB procedure.
+
+**CI (GitHub Actions):** `.github/workflows/security.yml` runs on push to and pull
+requests against `main` (plus manual dispatch): a `security-audit` job
+(`pip check`, `bandit -ll`, `pip-audit`) and a `django-tests` job on a disposable
+MySQL 8 service container (system check, migration consistency, deployment check,
+the focused concurrency test — required to run, never skipped — then the full suite).
+It uses dummy, disposable CI-only credentials, sets read-only workflow permissions,
+and deploys nothing.
 
 ### 13. Start the development server
 
