@@ -7,6 +7,11 @@ Rules implemented from the C1 plan docs/phase-c1-admin-managed-imagery-plan.md �
   rejected outright — scriptable content).
 * a setting-driven size cap (default ~2 MB, override with
   ``UPLOAD_IMAGE_MAX_BYTES``).
+* a setting-driven maximum dimension per side (default 8000 px, override with
+  ``UPLOAD_IMAGE_MAX_DIMENSION``): enforced from the image header **before**
+  any expensive pixel decoding, and before Pillow's own decompression-bomb
+  guard has to fire (8000×8000 = 64 M px, below Pillow 11's warn threshold of
+  ~89.5 M px).
 * dimension guidance: dimension mismatches are **warnings** (surfaced as
   admin warning messages after a successful save), never silent rejection —
   an otherwise valid image whose ratio differs from the editorial box is
@@ -34,6 +39,11 @@ _ALLOWED_PIL_FORMATS = frozenset({"JPEG", "PNG", "WEBP"})
 def max_upload_bytes():
     """Configured upload cap. Default 2 MiB, overridable via settings."""
     return getattr(settings, "UPLOAD_IMAGE_MAX_BYTES", 2 * 1024 * 1024)
+
+
+def max_image_dimension():
+    """Configured per-side dimension cap. Default 8000 px via settings."""
+    return getattr(settings, "UPLOAD_IMAGE_MAX_DIMENSION", 8000)
 
 
 def image_name_lower(image_field_file):
@@ -94,10 +104,58 @@ def validate_upload_image(
         pass  # read from wherever the pointer currently is
 
     from PIL import Image, UnidentifiedImageError  # imported lazily: Pillow is an upload-time dependency only
+    from PIL.Image import DecompressionBombError
 
+    # --- PASS 1: header-only probe (no pixel decode) -----------------------
+    # Image.open() is lazy: reading .size/.format parses just the header, so
+    # the format allowlist and the dimension cap are enforced **before**
+    # Pillow decodes any pixels.
     try:
+        image_field_file.seek(0)
+        with Image.open(io.BytesIO(image_field_file.read())) as probe:
+            width, height = probe.size
+            real_format = probe.format
+    except UnidentifiedImageError:
+        raise ValidationError(
+            _("This file is not a decodable image (JPG, PNG, WebP required).")
+        )
+    except Exception:
+        raise ValidationError(
+            _("This image could not be read as a valid JPG, PNG, or WebP file.")
+        )
+    finally:
+        try:
+            image_field_file.seek(0)
+        except (OSError, AttributeError):
+            pass
+
+    if real_format not in _ALLOWED_PIL_FORMATS:
+        raise ValidationError(
+            _("Unsupported image content: decoded as %(kind)s. Allowed: JPG, PNG, WebP.")
+            % {"kind": real_format or _("unknown")}
+        )
+
+    # --- DIMENSION CAP: header data only, still zero pixels decoded --------
+    limit = max_image_dimension()
+    if max(width, height) > limit:
+        raise ValidationError(
+            _("Image is too large (max %(max)d px per side, got %(w)d×%(h)d).")
+            % {"max": limit, "w": width, "h": height}
+        )
+
+    # --- PASS 2: integrity verification (full decode) ----------------------
+    # Pillow's decompression-bomb safeguards remain enabled: anything it
+    # refuses to verify (truncated, bomb-sized, corrupt) reaches the same
+    # user-facing rejection path.
+    try:
+        image_field_file.seek(0)
         decoded = Image.open(io.BytesIO(image_field_file.read()))
         decoded.verify()
+    except DecompressionBombError:
+        raise ValidationError(
+            _("Image dimensions are too large to process (max %(max)d px per side).")
+            % {"max": limit}
+        )
     except UnidentifiedImageError:
         raise ValidationError(
             _("This file is not a decodable image (JPG, PNG, WebP required).")
@@ -123,23 +181,6 @@ def validate_upload_image(
     if size and size > max_upload_bytes():
         raise ValidationError(
             _("Image is too large (max %(max)s MB).") % {"max": round(max_upload_bytes() / (1024 * 1024))}
-        )
-
-    # Re-open after verify() for real dimensions.
-    try:
-        image_field_file.seek(0)
-        with Image.open(io.BytesIO(image_field_file.read())) as reopened:
-            width, height = reopened.size
-            real_format = reopened.format
-        image_field_file.seek(0)
-    except Exception:
-        raise ValidationError(
-            _("This image could not be read as a valid JPG, PNG, or WebP file.")
-        )
-    if real_format not in _ALLOWED_PIL_FORMATS:
-        raise ValidationError(
-            _("Unsupported image content: decoded as %(kind)s. Allowed: JPG, PNG, WebP.")
-            % {"kind": real_format or _("unknown")}
         )
 
     if warn_width and width and width < warn_width:

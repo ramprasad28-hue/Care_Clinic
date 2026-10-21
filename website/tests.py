@@ -234,6 +234,7 @@ from django.views.static import serve
 from website.image_validation import (
     PORTRAIT_MIN_WIDTH,
     SECTION_MIN_WIDTH,
+    max_image_dimension,
     max_upload_bytes,
     validate_upload_image,
 )
@@ -259,6 +260,31 @@ def png_bytes(width=1200, height=800, color=(20, 130, 140)):
 
 def upload(name="image.png", data=None, content_type="image/png"):
     return SimpleUploadedFile(name, png_bytes() if data is None else data, content_type)
+
+
+def png_header_only_bytes(width, height):
+    """A minimal PNG containing only a signature and IHDR/IEND chunks.
+
+    Pillow reads the declared dimensions from the header without allocating
+    or decoding any pixels — safe for exercising the dimension guard.
+    """
+    import struct
+    import zlib
+
+    signature = b"\x89PNG\r\n\x1a\n"
+
+    def chunk(ctype, data):
+        return (
+            struct.pack(">I", len(data)) + ctype + data
+            + struct.pack(">I", zlib.crc32(ctype + data) & 0xFFFFFFFF)
+        )
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    return (
+        signature
+        + chunk(b"IHDR", ihdr)
+        + chunk(b"IEND", b"")
+    )
 
 
 class UploadImageValidationTests(TestCase):
@@ -305,6 +331,72 @@ class UploadImageValidationTests(TestCase):
         with override_settings(UPLOAD_IMAGE_MAX_BYTES=10):
             with self.assertRaises(ValidationError):
                 validate_upload_image(upload())  # valid PNG, exceeds the 10-byte cap
+
+    # --- dimension cap (F-06 follow-up: resource hardening) --------------
+    def test_dimension_cap_is_setting_driven(self):
+        self.assertEqual(max_image_dimension(), 8000)
+
+    def test_width_beyond_dimension_cap_rejected_before_decode(self):
+        """A header declaring a wide image is rejected from header data
+        alone — no pixels are ever decoded for an over-limit upload.
+        """
+        data = png_header_only_bytes(9000, 10)
+        with override_settings(UPLOAD_IMAGE_MAX_DIMENSION=8000):
+            with self.assertRaises(ValidationError):
+                validate_upload_image(upload("card.png", data))
+
+    def test_height_beyond_dimension_cap_rejected_before_decode(self):
+        data = png_header_only_bytes(10, 9000)
+        with override_settings(UPLOAD_IMAGE_MAX_DIMENSION=8000):
+            with self.assertRaises(ValidationError):
+                validate_upload_image(upload("card.png", data))
+
+    def test_dimensions_within_cap_override_pass(self):
+        image = upload("card.png", png_bytes(400, 300))
+        self.assertEqual(
+            validate_upload_image(image),
+            [],
+        )
+        with override_settings(UPLOAD_IMAGE_MAX_DIMENSION=300):
+            self.assertRaises(
+                ValidationError, validate_upload_image, upload("card.png")
+            )
+
+    def test_custom_dimension_cap_enforced(self):
+        """The guard honours a tight configured cap even when the image's
+        natural dimensions sit far below the default 8000 px.
+        """
+        data = png_header_only_bytes(1200, 800)
+        with override_settings(UPLOAD_IMAGE_MAX_DIMENSION=800):
+            with self.assertRaises(ValidationError):
+                validate_upload_image(upload("card.png", data))
+
+        with override_settings(UPLOAD_IMAGE_MAX_DIMENSION=1200):
+            warnings = validate_upload_image(
+                upload("card.png", png_bytes(1200, 800)), warn_ratio="3/2"
+            )
+            self.assertEqual(warnings, [])  # exactly at the cap: accepted
+
+    def test_truncated_image_rejected(self):
+        """A decodable-format image whose data is cut off is rejected by the
+        integrity pass (header parses, no complete pixel stream).
+        """
+        valid = png_bytes(100, 100)
+        truncated = valid[: len(valid) - 30]
+        with self.assertRaises(ValidationError):
+            validate_upload_image(upload("card.png", truncated))
+
+    def test_pillow_bomb_guard_surfaces_as_validation_error(self):
+        """Pillow's own decompression-bomb safeguard stays enabled; when it
+        fires the caller still sees a plain ValidationError (never a 500).
+        """
+        from unittest import mock
+        from PIL import Image
+        from PIL.Image import DecompressionBombError
+
+        with mock.patch.object(Image, "open", side_effect=DecompressionBombError("x")):
+            with self.assertRaises(ValidationError):
+                validate_upload_image(upload())
 
     def test_no_file_bound_is_accepted(self):
         self.assertEqual(validate_upload_image(None), [])
