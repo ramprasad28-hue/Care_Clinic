@@ -24,10 +24,12 @@ python-dotenv>=1.0,<2.0
 # + size cap) for Speciality.image, Doctor.profile_image and
 # website.WebsiteSectionImage. ADR-020 (no frontend framework/build step)
 # is unaffected: this is not a frontend dependency.
-Pillow>=10.0,<12.0
+# Floor at 13.0.0: pip-audit (Phase 8 step 9) showed several 2026
+# advisories against 11.3.x that are only patched from 13.0.0 onward.
+Pillow>=13.0.0,<14.0.0
 
 # --- Development & testing ---
-pytest>=8.0,<9.0
+pytest>=9.0.3,<10.0
 pytest-django>=4.8,<5.0
 coverage>=7.4,<8.0
 
