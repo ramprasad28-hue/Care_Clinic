@@ -1,5 +1,8 @@
 ﻿"""Tests for the public website (home, specialities, doctors)."""
+from pathlib import Path
+
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import resolve, reverse
 
@@ -875,3 +878,111 @@ class ContactFaqNavigationTests(TestCase):
     def test_urls_resolve_to_expected_views(self):
         self.assertEqual(resolve("/contact/").view_name, "contact")
         self.assertEqual(resolve("/faq/").view_name, "faq")
+
+
+class DemoImageryStaticTests(TestCase):
+    """Batch-4 static assets: every demo speciality/doctor resolves its file.
+
+    Fallback behavior is untouched: the helpers still return "" for unknown
+    slugs (the initials avatar renders instead) and the manifest must still
+    document every new raster file.
+    """
+
+    NEW_SLUGS = {
+        "speciality": ("neurology", "ear-nose-throat", "ophthalmology", "gynaecology"),
+        "doctor": (
+            "sabari",
+            "prabhakaran",
+            "sanjay-krishna",
+            "radha-krishnan",
+            "swetha",
+        ),
+    }
+    MANIFEST = Path(__file__).resolve().parents[1] / "docs" / "imagery-licensing.md"
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_clinic")
+
+    def test_speciality_detail_renders_expected_tile(self):
+        for slug in self.NEW_SLUGS["speciality"]:
+            speciality = Speciality.objects.get(slug=slug)
+            response = self.client.get(speciality.get_absolute_url())
+            with self.subTest(slug=slug):
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response,
+                    f"/static/img/specialities/{slug}-card.jpg",
+                    msg_prefix=slug,
+                )
+
+    def test_doctor_detail_renders_expected_portrait(self):
+        for slug in self.NEW_SLUGS["doctor"]:
+            doctor = Doctor.objects.get(slug=slug)
+            response = self.client.get(doctor.get_absolute_url())
+            with self.subTest(slug=slug):
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response,
+                    f"/static/img/doctors/{slug}-profile.webp",
+                    msg_prefix=slug,
+                )
+
+    def test_portrait_files_are_all_distinct(self):
+        digests = set()
+        import hashlib
+
+        base = Path(__file__).resolve().parents[1] / "static" / "img" / "doctors"
+        for slug in self.NEW_SLUGS["doctor"]:
+            data = (base / f"{slug}-profile.webp").read_bytes()
+            digests.add(hashlib.sha256(data).hexdigest())
+        self.assertEqual(len(digests), 5)
+
+    def test_initials_avatar_fallback_survives(self):
+        spec = Speciality.objects.get(slug="neurology")
+        user = User.objects.create_user(
+            email="noimage@example.com",
+            password="S3cret-pass!",
+            role=User.Role.DOCTOR,
+            first_name="Noor",
+        )
+        doctor = Doctor.objects.create(
+            user=user,
+            speciality=spec,
+            registration_number="REG-IMG-FALLBACK",
+            qualification="MBBS",
+        )
+        response = self.client.get(doctor.get_absolute_url())
+        # No static file for the in-test slug: the initials avatar renders
+        # here instead (other demo doctors' portraits still resolve elsewhere).
+        self.assertNotContains(response, "/img/doctors/noor-profile.webp")
+        self.assertNotContains(response, "static/img/doctors/noor-profile.webp")
+        self.assertContains(response, "avatar--xl")
+        self.assertContains(response, ">N")
+
+    def check_manifest_covers(self, filenames):
+        text = self.MANIFEST.read_text(encoding="utf-8")
+        for name in filenames:
+            self.assertIn(name, text)
+
+    def test_manifest_documents_every_new_raster_image(self):
+        self.check_manifest_covers(
+            [f"static/img/specialities/{s}-card.jpg" for s in self.NEW_SLUGS["speciality"]]
+            + [f"static/img/doctors/{d}-profile.webp" for d in self.NEW_SLUGS["doctor"]]
+        )
+
+    def test_manifest_records_pexels_licence_and_photographers(self):
+        text = self.MANIFEST.read_text(encoding="utf-8")
+        for photographer in (
+            "Anna Shvets",
+            "Karolina Grabowska",
+            "Antoni Shkraba",
+            "MART PRODUCTION",
+            "Daniil Kondrashin",
+            "Tima Miroshnichenko",
+            "Layth Mushreq",
+            "Oys Photography",
+            "KAWENY DENYELE",
+        ):
+            self.assertIn(photographer, text)
+        self.assertIn("pexels.com/license", text)

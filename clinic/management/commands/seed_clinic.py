@@ -12,7 +12,7 @@ Idempotent: safe to run multiple times (uses ``get_or_create`` /
 from datetime import date, time, timedelta
 
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from clinic.models import AvailabilityRule, Doctor, DoctorLeave, Speciality, Weekday
@@ -25,8 +25,16 @@ SPECIALITIES = [
     ("General Medicine", "Primary care, preventive checks, and common illnesses."),
     ("Paediatrics", "Healthcare for infants, children, and adolescents."),
     ("Orthopaedics", "Bones, joints, and musculoskeletal injury care."),
+    ("Neurology", "Brain, spine, and nervous system care and diagnostics."),
+    ("Ear, Nose & Throat", "ENT care: hearing, sinus, throat, and balance issues."),
+    ("Ophthalmology", "Eye care, vision testing, and ocular treatment."),
+    ("Gynaecology", "Women's reproductive health and wellness care."),
 ]
 
+# Demo doctor profiles. Everything here is **synthetic**: qualification strings
+# are explicitly labelled as unverified demo data, no real registration
+# numbers, bios claim nothing factual, and consultation fees are left unset.
+# Speciality assignments are easy to edit: reorder/rename here and rerun.
 DOCTORS = [
     {
         "email": "dr.aswin@careclinic.example",
@@ -58,6 +66,61 @@ DOCTORS = [
         "bio": "General physician providing primary and preventive care.",
         "consultation_fee": "300.00",
     },
+    {
+        "email": "dr.sabari@careclinic.example",
+        "first_name": "Sabari",
+        "last_name": "",
+        "speciality": "Neurology",
+        "registration_number": "DEMO-REG-2001",
+        "qualification": "Demo profile — credentials not verified",
+        "bio": "Synthetic demo profile. Speciality assignment is illustrative "
+        "only and must be verified before any real clinical use.",
+        "consultation_fee": None,
+    },
+    {
+        "email": "dr.prabhakaran@careclinic.example",
+        "first_name": "Prabhakaran",
+        "last_name": "",
+        "speciality": "Ear, Nose & Throat",
+        "registration_number": "DEMO-REG-2002",
+        "qualification": "Demo profile — credentials not verified",
+        "bio": "Synthetic demo profile. Speciality assignment is illustrative "
+        "only and must be verified before any real clinical use.",
+        "consultation_fee": None,
+    },
+    {
+        "email": "dr.sanjay.krishna@careclinic.example",
+        "first_name": "Sanjay",
+        "last_name": "Krishna",
+        "speciality": "Ophthalmology",
+        "registration_number": "DEMO-REG-2003",
+        "qualification": "Demo profile — credentials not verified",
+        "bio": "Synthetic demo profile. Speciality assignment is illustrative "
+        "only and must be verified before any real clinical use.",
+        "consultation_fee": None,
+    },
+    {
+        "email": "dr.radha.krishnan@careclinic.example",
+        "first_name": "Radha",
+        "last_name": "Krishnan",
+        "speciality": "Gynaecology",
+        "registration_number": "DEMO-REG-2004",
+        "qualification": "Demo profile — credentials not verified",
+        "bio": "Synthetic demo profile. Speciality assignment is illustrative "
+        "only and must be verified before any real clinical use.",
+        "consultation_fee": None,
+    },
+    {
+        "email": "dr.swetha@careclinic.example",
+        "first_name": "Swetha",
+        "last_name": "",
+        "speciality": "General Medicine",
+        "registration_number": "DEMO-REG-2005",
+        "qualification": "Demo profile — credentials not verified",
+        "bio": "Synthetic demo profile. Speciality assignment is illustrative "
+        "only and must be verified before any real clinical use.",
+        "consultation_fee": None,
+    },
 ]
 
 # (weekday, start, end, slot_length) windows applied to every seeded doctor.
@@ -74,6 +137,20 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        # Refuse (never silently re-role) if a reserved demo email is taken by
+        # an account with a different role.
+        for spec in DOCTORS:
+            clash = User.objects.filter(email=spec["email"]).exclude(
+                role=User.Role.DOCTOR
+            )
+            if clash.exists():
+                raise CommandError(
+                    f"Refusing to seed doctor email '{spec['email']}': it "
+                    f"already belongs to an account with role "
+                    f"'{clash.first().role}'. Resolve the conflict manually "
+                    "(no records were changed)."
+                )
+
         specialities = {}
         for name, description in SPECIALITIES:
             obj, created = Speciality.objects.update_or_create(

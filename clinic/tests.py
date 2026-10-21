@@ -449,17 +449,120 @@ class AdminAuthorizationTests(TestCase):
 class SeedClinicCommandTests(TestCase):
     def test_seed_creates_data(self):
         call_command("seed_clinic")
-        self.assertEqual(Speciality.objects.count(), 5)
-        self.assertEqual(Doctor.objects.count(), 3)
+        self.assertEqual(Speciality.objects.count(), 9)
+        self.assertEqual(Doctor.objects.count(), 8)
         self.assertTrue(AvailabilityRule.objects.exists())
         self.assertTrue(DoctorLeave.objects.exists())
 
     def test_seed_is_idempotent(self):
         call_command("seed_clinic")
         call_command("seed_clinic")
-        self.assertEqual(Speciality.objects.count(), 5)
-        self.assertEqual(Doctor.objects.count(), 3)
-        self.assertEqual(User.objects.filter(role=User.Role.DOCTOR).count(), 3)
+        self.assertEqual(Speciality.objects.count(), 9)
+        self.assertEqual(Doctor.objects.count(), 8)
+        self.assertEqual(User.objects.filter(role=User.Role.DOCTOR).count(), 8)
+
+
+class SeedExpansionTests(TestCase):
+    """Expanded demo dataset: four specialities, five doctors (batch 4)."""
+
+    NEW_SPECIALITIES = (
+        ("Neurology", "neurology"),
+        ("Ear, Nose & Throat", "ear-nose-throat"),
+        ("Ophthalmology", "ophthalmology"),
+        ("Gynaecology", "gynaecology"),
+    )
+
+    NEW_DOCTORS = {
+        "dr.sabari@careclinic.example": "Neurology",
+        "dr.prabhakaran@careclinic.example": "Ear, Nose & Throat",
+        "dr.sanjay.krishna@careclinic.example": "Ophthalmology",
+        "dr.radha.krishnan@careclinic.example": "Gynaecology",
+        "dr.swetha@careclinic.example": "General Medicine",
+    }
+
+    def seed(self):
+        call_command("seed_clinic")
+
+    def test_four_new_specialities_created_active_with_valid_slugs(self):
+        self.seed()
+        for name, slug in self.NEW_SPECIALITIES:
+            spec = Speciality.objects.filter(name=name).first()
+            self.assertIsNotNone(spec, name)
+            self.assertTrue(spec.is_active, name)
+            self.assertEqual(spec.slug, slug, name)
+
+    def test_five_new_doctor_users_have_doctor_role(self):
+        self.seed()
+        for email in self.NEW_DOCTORS:
+            user = User.objects.filter(email=email).first()
+            self.assertIsNotNone(user, email)
+            self.assertEqual(user.role, User.Role.DOCTOR, email)
+            self.assertEqual(user.doctor.user, user, email)  # exactly one related
+
+    def test_profiles_point_to_intended_specialities(self):
+        self.seed()
+        for email, speciality in self.NEW_DOCTORS.items():
+            doctor = User.objects.get(email=email).doctor
+            self.assertEqual(doctor.speciality.name, speciality, email)
+            self.assertTrue(doctor.is_accepting_appointments, email)
+
+    def test_demo_registration_identifiers_unique(self):
+        self.seed()
+        numbers = [
+            User.objects.get(email=email).doctor.registration_number
+            for email in self.NEW_DOCTORS
+        ]
+        self.assertEqual(len(numbers), len(set(numbers)))
+        for number in numbers:
+            self.assertTrue(number.startswith("DEMO-REG-"), number)
+
+    def test_new_doctors_have_valid_availability_rules(self):
+        self.seed()
+        # 8 doctors x 4 seed windows, all saved through full_clean (valid).
+        self.assertEqual(AvailabilityRule.objects.count(), 32)
+        for email in self.NEW_DOCTORS:
+            doctor = User.objects.get(email=email).doctor
+            self.assertEqual(
+                doctor.availability_rules.filter(is_active=True).count(), 4, email
+            )
+
+    def test_new_demo_profiles_marked_unverified_with_no_fee(self):
+        self.seed()
+        for email in self.NEW_DOCTORS:
+            doctor = User.objects.get(email=email).doctor
+            self.assertIn("not verified", doctor.qualification, email)
+            self.assertIsNone(doctor.consultation_fee, email)
+
+    def test_rerun_keeps_existing_usable_password(self):
+        user = User.objects.create_user(
+            email="dr.swetha@careclinic.example",
+            password="Us3r-picked-pw!",
+            role=User.Role.DOCTOR,
+        )
+        self.assertTrue(user.check_password("Us3r-picked-pw!"))
+        self.seed()
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("Us3r-picked-pw!"))
+
+    def test_role_conflict_fails_safely_without_changes(self):
+        make_user(email="dr.swetha@careclinic.example", role=User.Role.PATIENT)
+        before = User.objects.count()
+        with self.assertRaises(Exception):
+            call_command("seed_clinic")
+        self.assertEqual(User.objects.count(), before)
+        self.assertEqual(Doctor.objects.count(), 0)
+        self.assertEqual(Speciality.objects.count(), 0)
+
+    def test_pre_existing_other_specialities_untouched(self):
+        psych = make_speciality("Psychiatrist")
+        self.seed()
+        psych.refresh_from_db()
+        self.assertEqual(psych.name, "Psychiatrist")
+        self.assertTrue(psych.is_active)
+        # Exactly one Psychiatry-family record, no duplicates.
+        self.assertEqual(
+            Speciality.objects.filter(name__icontains="psychiat").count(), 1
+        )
 
 
 # --------------------------------------------------------------------------

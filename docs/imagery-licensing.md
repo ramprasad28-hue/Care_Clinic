@@ -68,6 +68,52 @@ When genuine, consented portraits for actual clinic doctors exist, they
 replace these files one-for-one (same naming convention
 `static/img/doctors/<slug>-profile.webp`) and this manifest is updated.
 
+## Assets (batch 3 — demo-dataset expansion, acquired 2026-10-21)
+
+Four speciality tiles and five individual demo portraits for the expanded
+seed dataset (`seed_clinic` + `seed_demo_receptionists`). Same rules as
+batches 1–2: all Pexels-sourced, downloaded from `images.pexels.com`
+(resized CDN delivery of the photographer's original), stored re-locally, and
+never presented as genuine photographs of real clinic doctors, staff, or
+premises. Portrait subjects are five **different people** (see batch-2
+honesty rules; batch 3 repeats the per-doctor one-face-one-slug mapping and
+the standing rejection of same-model reuse).
+
+### Speciality tiles (static 900×600 JPEG card images)
+
+| File | Source (Pexels photo) | Photographer | Licence | Source date | Dimensions in repo | Alt text | Intended use |
+|---|---|---|---|---|---|---|---|
+| `static/img/specialities/neurology-card.jpg` | pexels.com/photo/doctor-pointing-to-an-mri-scan-4226123 | Anna Shvets | Pexels (free, commercial, attribution optional) | 2020-04-23 | 900×600 (CDN `w=900&h=600&fit=crop`) | empty (decorative; card title carries meaning) | Speciality card tile — Neurology (atmosphere image, decorative) |
+| `static/img/specialities/ear-nose-throat-card.jpg` | pexels.com/photo/a-doctor-doing-an-ear-examination-5206942 | Karolina Grabowska (kaboompics studio, Pexels handle @karola-g) | Pexels (free, commercial, attribution optional) | 2020-08-27 | 900×600 (CDN `w=900&h=600&fit=crop`) | empty (decorative) | Speciality card tile — Ear, Nose & Throat (atmosphere image, decorative) |
+| `static/img/specialities/ophthalmology-card.jpg` | pexels.com/photo/a-patient-having-eye-examination-6749698 | Antoni Shkraba | Pexels (free, commercial, attribution optional) | 2021-02-08 | 900×600 (CDN `w=900&h=600&fit=crop`) | empty (decorative) | Speciality card tile — Ophthalmology (atmosphere image, decorative) |
+| `static/img/specialities/gynaecology-card.jpg` | pexels.com/photo/people-woman-sitting-technology-7089387 | MART PRODUCTION | Pexels (free, commercial, attribution optional) | 2021-03-09 | 900×600 (CDN `w=900&h=600&fit=crop`) | empty (decorative) | Speciality card tile — Gynaecology (atmosphere image, decorative) |
+
+### Demo doctor portraits (static WebP `w=800` delivery)
+
+| File | Source (Pexels photo) | Photographer | Licence | Source date | Dimensions in repo | Alt text | Intended use |
+|---|---|---|---|---|---|---|---|
+| `static/img/doctors/sabari-profile.webp` | pexels.com/photo/confident-male-doctor-in-white-coat-37407191 | Daniil Kondrashin | Pexels (free, commercial, attribution optional) | 2026-05-03 | 800×1200 (CDN `w=800`, `fm=webp`) | empty (decorative; adjacent name carries meaning) | Demo portrait for demo doctor **Dr. Sabari** (Neurology) — listing cards, profile masthead, Doctors mega menu |
+| `static/img/doctors/prabhakaran-profile.webp` | pexels.com/photo/doctor-crossed-arms-5452204 | Tima Miroshnichenko | Pexels (free, commercial, attribution optional) | page-acquired 2026-10-21 (original take-up date not recorded on source page snippet) | 800×533 (CDN `w=800`, `fm=webp`) | empty (decorative) | Demo portrait for demo doctor **Dr. Prabhakaran** (Ear, Nose & Throat) — same three surfaces |
+| `static/img/doctors/sanjay-krishna-profile.webp` | pexels.com/photo/professional-male-doctor-in-white-lab-coat-37272297 | Layth Mushreq | Pexels (free, commercial, attribution optional) | 2026-04-26 | 800×1200 (CDN `w=800`, `fm=webp`) | empty (decorative) | Demo portrait for demo doctor **Dr. Sanjay Krishna** (Ophthalmology) — same three surfaces |
+| `static/img/doctors/radha-krishnan-profile.webp` | pexels.com/photo/doctor-19438563 | Oys Photography | Pexels (free, commercial, attribution optional) | 2023-12-09 | 800×533 (CDN `w=800`, `fm=webp`) | empty (decorative) | Demo portrait for demo doctor **Dr. Radha Krishnan** (Gynaecology) — same three surfaces |
+| `static/img/doctors/swetha-profile.webp` | pexels.com/photo/smiling-female-doctor-in-white-coat-33067699 | KAWENY DENYELE | Pexels (free, commercial, attribution optional) | 2025-07-18 | 800×1200 (CDN `w=800`, `fm=webp`) | empty (decorative) | Demo portrait for demo doctor **Dr. Swetha** (General Medicine) — same three surfaces |
+
+**Honesty status of this batch:** all five doctors above are seed/demo
+records (`seed_clinic`), not verified actual clinic doctors. Qualification
+fields on the new five are stored literally as "Demo profile — credentials
+not verified", bios state that the speciality assignment is illustrative and
+must be verified before real clinical use, consultation fees are left unset,
+and registration numbers use the reserved `DEMO-REG-2xxx` range (no real
+medical council numbers). The portraits are licensed stock placeholders in a
+one-face-per-doctor mapping, styled consistently with batch 2 (professional
+clinical clothing, neutral backgrounds, `object-fit: cover` portrait crops);
+the doctor profile page keeps its standing "Illustrative stock photo — not a
+photograph of Dr. …" honesty aside. A masked-emergency-room candidate
+(6129574) and the Usman Yousaf studio shoot (already used for Rahul Verma in
+batch 2) were rejected to avoid same-face reuse. Replacement advice is
+identical to batch 2: when genuine, consented portraits exist, replace these
+one-for-one under the same `<slug>-profile.webp` naming and update this manifest.
+
 ## Rules applied (summary)
 
 - Downloaded and stored locally; no CDN/hotlink in any template (`{% static %}` only).

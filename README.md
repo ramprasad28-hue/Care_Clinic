@@ -176,13 +176,45 @@ python manage.py makemigrations --check --dry-run   # assert no missing migratio
 ```powershell
 python manage.py createsuperuser   # login is by email
 python manage.py sync_roles        # create role Groups + permissions (idempotent)
-python manage.py seed_clinic       # create synthetic specialities + doctors (idempotent)
+python manage.py seed_clinic       # synthetic specialities + doctors (idempotent)
+python manage.py seed_demo_receptionists  # demo RECEPTIONIST accounts (idempotent)
 python manage.py generate_slots    # materialize bookable slots (idempotent; --days N)
 ```
 
+Run `seed_clinic` first, then `sync_roles` (charts memberships by role), then
+`seed_demo_receptionists` and finally `generate_slots` — review the seeded
+availability (`clinic:availability_list` or Django admin) before generating.
+
 Privileged roles (Doctor/Receptionist/Admin) are provisioned by an administrator — never
-through public registration. `seed_clinic` also provisions three **DOCTOR-role demo users**
-with unusable passwords (they cannot log in) purely to populate the public catalog.
+through public registration. `seed_clinic` provisions **eight DOCTOR-role demo users** with
+unusable passwords (they cannot log in): Aswin Kumar, Meera Nair, Rahul Verma, plus the
+batch-4 expansion Sabari (Neurology), Prabhakaran (Ear, Nose & Throat), Sanjay Krishna
+(Ophthalmology), Radha Krishnan (Gynaecology), and Swetha (General Medicine). Their
+qualifications are stored literally as "Demo profile — credentials not verified", no real
+registration numbers or consultation fees are invented, and the speciality assignments are
+synthetic demo choices (edit the `DOCTORS` list in
+`clinic/management/commands/seed_clinic.py` and rerun to change them).
+
+`seed_demo_receptionists` creates two RECEPTIONIST demo accounts
+(`ramprasad.reception@careclinic.example`, `rishabh.reception@careclinic.example`). Demo
+credentials are never hardcoded anywhere in the repository: new accounts receive **unusable
+passwords**, reruns never reset an existing usable password, and a reserved demo email held
+by an account with a different role aborts the seed with a clear error instead of silently
+re-rolling that user. An authorized administrator can set a **local** demo password for one
+environment only:
+
+```powershell
+python manage.py changepassword ramprasad.reception@careclinic.example
+```
+
+...then rerun `sync_roles` so the accounts join the Receptionist group with its
+permissions. `careclinic.example` is a reserved documentation domain (RFC 2606): these
+addresses cannot receive real mail and identify the records as synthetic.
+
+Medical credentials, names, and speciality assignments across the demo dataset **must be
+verified before any real-world use** — everything seeded here is synthetic with deliberately
+unverified credentials. Imagery for the demo set is licensed stock, documented per file in
+`docs/imagery-licensing.md` (batch 3).
 
 ### 7. Authentication & RBAC (Phase 3)
 

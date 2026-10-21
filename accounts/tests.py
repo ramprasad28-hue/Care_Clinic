@@ -927,3 +927,47 @@ class UserAdminSecurityTests(TestCase):
         self.assertTrue(created.is_staff)
         self.assertFalse(created.is_superuser)
         self.assertTrue(created.check_password(PASSWORD))
+
+
+class SeedDemoReceptionistsCommandTests(TestCase):
+    CMD = "seed_demo_receptionists"
+    EMAILS = (
+        "ramprasad.reception@careclinic.example",
+        "rishabh.reception@careclinic.example",
+    )
+
+    def test_creates_two_receptionists_with_unusable_passwords(self):
+        call_command(self.CMD)
+        self.assertEqual(User.objects.count(), 2)
+        for email in self.EMAILS:
+            user = User.objects.filter(email=email).first()
+            self.assertIsNotNone(user, email)
+            self.assertEqual(user.role, User.Role.RECEPTIONIST, email)
+            self.assertFalse(user.is_staff, email)
+            self.assertFalse(user.is_superuser, email)
+            self.assertFalse(user.check_password("anything-at-all"), email)
+
+    def test_rerun_is_idempotent_and_preserves_usable_passwords(self):
+        call_command(self.CMD)
+        ramprasad = User.objects.get(email=self.EMAILS[0])
+        ramprasad.set_password("Admin-set-local-pw!")
+        ramprasad.save(update_fields=["password"])
+        call_command(self.CMD)
+        self.assertEqual(User.objects.count(), 2)
+        ramprasad.refresh_from_db()
+        self.assertTrue(ramprasad.check_password("Admin-set-local-pw!"))
+        rishabh = User.objects.get(email=self.EMAILS[1])
+        self.assertFalse(rishabh.check_password("Admin-set-local-pw!"))
+
+    def test_conflicting_reserved_email_fails_safely(self):
+        User.objects.create_user(
+            email=self.EMAILS[0],
+            password="S3cret-pass!",
+            role=User.Role.PATIENT,
+        )
+        before = User.objects.count()
+        with self.assertRaises(Exception):
+            call_command(self.CMD)
+        # The whole command runs inside one transaction: nothing seeded.
+        self.assertEqual(User.objects.count(), before)
+        self.assertFalse(User.objects.filter(email=self.EMAILS[1]).exists())
