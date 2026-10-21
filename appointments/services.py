@@ -183,10 +183,16 @@ def book_slot(slot_id, *, actor, patient=None, reason="", doctor=None):
 # --------------------------------------------------------------------------
 @transaction.atomic
 def cancel_appointment(appointment_pk, *, actor, reason=""):
-    """Cancel an appointment, preserving the record and releasing the slot."""
+    """Cancel an appointment, preserving the record and releasing the slot.
+
+    The lookup goes through the role-scoped ``for_user`` queryset so a
+    foreign (unauthorized) appointment is indistinguishable from a
+    nonexistent one — only the actor's own record can ever be loaded here.
+    """
     try:
         appointment = (
-            Appointment.objects.select_for_update()
+            Appointment.objects.for_user(actor)
+            .select_for_update()
             .select_related("slot")
             .get(pk=appointment_pk)
         )
@@ -225,11 +231,14 @@ def reschedule_appointment(appointment_pk, *, actor, new_slot_id):
     """Move an active appointment to ``new_slot_id`` atomically.
 
     If anything fails the whole transaction rolls back, leaving the original
-    booking intact.
+    booking intact. The lookup goes through the role-scoped ``for_user``
+    queryset; a foreign (unauthorized) appointment is indistinguishable
+    from a nonexistent one.
     """
     try:
         appointment = (
-            Appointment.objects.select_for_update()
+            Appointment.objects.for_user(actor)
+            .select_for_update()
             .select_related("slot")
             .get(pk=appointment_pk)
         )
@@ -273,10 +282,15 @@ def reschedule_appointment(appointment_pk, *, actor, new_slot_id):
 # --------------------------------------------------------------------------
 @transaction.atomic
 def transition_status(appointment_pk, *, actor, new_status, reason=""):
-    """Apply an allowed status transition (never bypasses the state machine)."""
+    """Apply an allowed status transition (never bypasses the state machine).
+
+    The lookup goes through the role-scoped ``for_user`` queryset; a foreign
+    (unauthorized) appointment is indistinguishable from a nonexistent one.
+    """
     try:
         appointment = (
-            Appointment.objects.select_for_update()
+            Appointment.objects.for_user(actor)
+            .select_for_update()
             .select_related("slot")
             .get(pk=appointment_pk)
         )

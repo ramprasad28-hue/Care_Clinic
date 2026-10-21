@@ -449,11 +449,18 @@ class CancellationTests(TestCase):
         self.assertEqual(appointment.status, AppointmentStatus.CANCELLED)
 
     def test_other_patient_cannot_cancel(self):
+        """Services resolve through the role-scoped for_user queryset: a
+        foreign appointment is indistinguishable from a nonexistent one and
+        no state is mutated.
+        """
         slot = make_slot(self.doctor, future_day(5))
         appointment = services.book_slot(slot.pk, actor=self.patient)
         other = make_user("other@example.com")
-        with self.assertRaises(PermissionDenied):
+        with self.assertRaises(services.BookingError):
             services.cancel_appointment(appointment.pk, actor=other)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, AppointmentStatus.REQUESTED)
+        self.assertFalse(appointment.is_terminal)
 
     def test_cannot_cancel_twice(self):
         slot = make_slot(self.doctor, future_day(5))
@@ -509,11 +516,17 @@ class ReschedulingTests(TestCase):
             )
 
     def test_other_patient_cannot_reschedule(self):
+        """Scoped services: a foreign appointment is indistinguishable from
+        a nonexistent one and the original slot booking is left unchanged.
+        """
         other = make_user("other@example.com")
-        with self.assertRaises(PermissionDenied):
+        with self.assertRaises(services.BookingError):
             services.reschedule_appointment(
                 self.appointment.pk, actor=other, new_slot_id=self.slot_b.pk
             )
+        self.appointment.refresh_from_db()
+        self.assertEqual(self.appointment.slot, self.slot_a)
+        self.assertEqual(self.appointment.status, AppointmentStatus.REQUESTED)
 
 
 # --------------------------------------------------------------------------
@@ -580,12 +593,14 @@ class StatusTransitionTests(TestCase):
 
     def test_doctor_cannot_update_others_appointment(self):
         other_doctor = make_doctor("doc2@example.com", speciality=self.doctor.speciality)
-        with self.assertRaises(PermissionDenied):
+        with self.assertRaises(services.BookingError):
             services.transition_status(
                 self.appointment.pk,
                 actor=other_doctor.user,
                 new_status=AppointmentStatus.CONFIRMED,
             )
+        self.appointment.refresh_from_db()
+        self.assertEqual(self.appointment.status, AppointmentStatus.REQUESTED)
 
     def test_patient_cannot_update_status(self):
         with self.assertRaises(PermissionDenied):
@@ -598,6 +613,130 @@ class StatusTransitionTests(TestCase):
     def test_can_transition_to_helper(self):
         self.assertTrue(self.appointment.can_transition_to(AppointmentStatus.CONFIRMED))
         self.assertFalse(self.appointment.can_transition_to(AppointmentStatus.COMPLETED))
+
+
+# --------------------------------------------------------------------------
+# Service scoping hardening (F-06 follow-up): role-scoped service lookups
+# --------------------------------------------------------------------------
+class ServiceScopingHardeningTests(TestCase):
+    """Direct service calls are scoped exactly like the views.
+
+    ``cancel_appointment``, ``reschedule_appointment`` and
+    ``transition_status`` resolve their target through
+    ``Appointment.objects.for_user(actor)``: a foreign appointment is
+    indistinguishable from a nonexistent one (identical BookingError), so no
+    direct service caller can learn whether someone else's appointment
+    exists. Records the actor *may* see still pass through the original
+    ``can_*`` predicates inside the transaction, and denied operations leave
+    both the appointment and the slot untouched.
+    """
+
+    def setUp(self):
+        self.doctor = make_doctor()
+        self.patient_a = make_user("a@example.com")
+        self.patient_b = make_user("b@example.com")
+        self.slot_a = make_slot(self.doctor, future_day(5), time(9, 0), time(9, 30))
+        self.free_slot = make_slot(self.doctor, future_day(5), time(9, 30), time(10, 0))
+        self.appointment = services.book_slot(self.slot_a.pk, actor=self.patient_a)
+
+    def _missing_pk(self):
+        return Appointment.objects.order_by("-pk").first().pk + 1
+
+    def _assert_state_unchanged(self):
+        self.appointment.refresh_from_db()
+        self.slot_a.refresh_from_db()
+        self.free_slot.refresh_from_db()
+        self.assertEqual(self.appointment.status, AppointmentStatus.REQUESTED)
+        self.assertIsNone(self.appointment.cancelled_by)
+        self.assertEqual(self.appointment.cancellation_reason, "")
+        self.assertEqual(self.appointment.slot, self.slot_a)
+        self.assertEqual(self.slot_a.status, SlotStatus.BOOKED)
+        self.assertEqual(self.free_slot.status, SlotStatus.OPEN)
+
+    def test_patient_cannot_cancel_foreign_appointment(self):
+        with self.assertRaises(services.BookingError) as foreign:
+            services.cancel_appointment(self.appointment.pk, actor=self.patient_b)
+        with self.assertRaises(services.BookingError) as missing:
+            services.cancel_appointment(self._missing_pk(), actor=self.patient_b)
+        self.assertEqual(
+            str(foreign.exception),
+            str(missing.exception),
+            "foreign and missing appointments must be indistinguishable",
+        )
+        self._assert_state_unchanged()
+
+    def test_patient_cannot_reschedule_foreign_appointment(self):
+        with self.assertRaises(services.BookingError) as foreign:
+            services.reschedule_appointment(
+                self.appointment.pk, actor=self.patient_b, new_slot_id=self.free_slot.pk
+            )
+        with self.assertRaises(services.BookingError) as missing:
+            services.reschedule_appointment(
+                self._missing_pk(), actor=self.patient_b, new_slot_id=self.free_slot.pk
+            )
+        self.assertEqual(
+            str(foreign.exception),
+            str(missing.exception),
+            "foreign and missing appointments must be indistinguishable",
+        )
+        self._assert_state_unchanged()
+
+    def test_doctor_cannot_cancel(self):
+        """Doctors have no cancel capability at all (architecture.md §6):
+        even an appointment on their own schedule is refused by the
+        predicate after the scoped fetch, and nothing is mutated.
+        """
+        with self.assertRaises(PermissionDenied):
+            services.cancel_appointment(self.appointment.pk, actor=self.doctor.user)
+        self._assert_state_unchanged()
+
+    def test_doctor_cannot_reschedule(self):
+        with self.assertRaises(PermissionDenied):
+            services.reschedule_appointment(
+                self.appointment.pk,
+                actor=self.doctor.user,
+                new_slot_id=self.free_slot.pk,
+            )
+        self._assert_state_unchanged()
+
+    def test_doctor_status_foreign_indistinguishable_from_missing(self):
+        other_doctor = make_doctor("docs2@example.com", speciality=self.doctor.speciality)
+        with self.assertRaises(services.BookingError) as foreign:
+            services.transition_status(
+                self.appointment.pk,
+                actor=other_doctor.user,
+                new_status=AppointmentStatus.CONFIRMED,
+            )
+        with self.assertRaises(services.BookingError) as missing:
+            services.transition_status(
+                self._missing_pk(),
+                actor=other_doctor.user,
+                new_status=AppointmentStatus.CONFIRMED,
+            )
+        self.assertEqual(
+            str(foreign.exception),
+            str(missing.exception),
+            "foreign and missing appointments must be indistinguishable",
+        )
+        self._assert_state_unchanged()
+
+    def test_receptionist_and_admin_workflows_still_work(self):
+        receptionist = make_user("recep@example.com", role=User.Role.RECEPTIONIST)
+        succeeded = services.cancel_appointment(self.appointment.pk, actor=receptionist)
+        self.assertEqual(succeeded.status, AppointmentStatus.CANCELLED)
+        self.slot_a.refresh_from_db()
+        self.assertEqual(self.slot_a.status, SlotStatus.OPEN)
+
+        # Admin confirms a fresh appointment for another patient (staff scope).
+        slot = make_slot(self.doctor, future_day(6))
+        booking = services.book_slot(slot.pk, actor=self.patient_b)
+        admin = make_user("admin@example.com", role=User.Role.ADMIN)
+        confirmed = services.transition_status(
+            booking.pk, actor=admin, new_status=AppointmentStatus.CONFIRMED
+        )
+        self.assertEqual(confirmed.status, AppointmentStatus.CONFIRMED)
+        slot.refresh_from_db()
+        self.assertEqual(slot.status, SlotStatus.BOOKED)
 
 
 # --------------------------------------------------------------------------
