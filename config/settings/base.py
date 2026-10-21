@@ -9,6 +9,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Load .env from the project root if present (never committed).
@@ -106,15 +108,58 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-# --- Email (used by password reset). Overridden to the console backend in
-# development; production must supply a real backend/credentials via env. ---
+# --- Email (used by password reset). Development overrides to the console
+# backend (config.settings.development); production reads the full SMTP
+# configuration from the environment (see .env.example) — individual SMTP
+# provider details (host, credentials) are supplied by whoever deploys. ---
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Care_Clinic <no-reply@careclinic.local>")
+
+
+def _env_bool(name):
+    """Parse an environment flag using the same truthy alphabet as DEBUG."""
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_number(name, cast):
+    """Parse an optional integer/float env setting; a bad value is itself
+    a startup-time configuration error (values are never echoed)."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return None
+    try:
+        return cast(raw)
+    except (TypeError, ValueError):
+        raise ImproperlyConfigured(
+            "%s must be a %s." % (name, "whole number" if cast is int else "number")
+        )
+
+
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = _env_number("EMAIL_PORT", int) or 25
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS")
+EMAIL_USE_SSL = _env_bool("EMAIL_USE_SSL")
+EMAIL_TIMEOUT = _env_number("EMAIL_TIMEOUT", float)
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    raise ImproperlyConfigured(
+        "EMAIL_USE_TLS and EMAIL_USE_SSL are mutually exclusive; set only one."
+    )
 
 # --- Database ---
 # DB_ENGINE selects the backend. Default is mysql (the intended primary
 # database, ADR-003). Set DB_ENGINE=sqlite ONLY as a documented local
 # fallback while MySQL credentials are unavailable (see docs/decisions.md).
 DB_ENGINE = os.environ.get("DB_ENGINE", "mysql").strip().lower()
+
+# Optional server-certificate verification for remote MySQL deployments:
+# when DATABASE_SSL_CA names a CA bundle, mysqlclient verifies the server
+# certificate chain (and hostname) against it during connect(). Empty or
+# whitespace-only means "no TLS configuration" — local behavior unchanged.
+DATABASE_SSL_CA = (os.environ.get("DATABASE_SSL_CA", "") or "").strip()
 
 if DB_ENGINE == "sqlite":
     DATABASES = {
@@ -124,6 +169,21 @@ if DB_ENGINE == "sqlite":
         }
     }
 else:
+    db_options = {
+        "charset": "utf8mb4",
+        "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+    }
+    if DATABASE_SSL_CA:
+        # Django's MySQL backend passes OPTIONS straight to mysqlclient's
+        # connect(). The `ssl` dict (mysql_ssl_set()) supplies the CA bundle,
+        # but on its own libmysqlclient only verifies the certificate *chain*
+        # — so ssl_mode=VERIFY_IDENTITY is set explicitly: it requires an
+        # encrypted connection, validates the server certificate against the
+        # given CA, and also verifies the certificate's hostname. No
+        # PREFERRED/REQUIRED/skip-verify fallback is used for this
+        # TLS-enabled configuration.
+        db_options["ssl"] = {"ca": DATABASE_SSL_CA}
+        db_options["ssl_mode"] = "VERIFY_IDENTITY"
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.mysql",
@@ -132,10 +192,7 @@ else:
             "PASSWORD": os.environ.get("DATABASE_PASSWORD", ""),
             "HOST": os.environ.get("DATABASE_HOST", "127.0.0.1"),
             "PORT": os.environ.get("DATABASE_PORT", "3306"),
-            "OPTIONS": {
-                "charset": "utf8mb4",
-                "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-            },
+            "OPTIONS": db_options,
             "TEST": {
                 "CHARSET": "utf8mb4",
                 "COLLATION": "utf8mb4_unicode_ci",

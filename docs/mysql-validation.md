@@ -90,3 +90,46 @@ and confirm the slot returns to `OPEN` and can be rebooked.
       both exist in MySQL.
 - [ ] Full suite green on MySQL, including the concurrency test (**not skipped**).
 - [ ] Manual booking/cancel/rebook smoke passes.
+
+## 6. Optional MySQL TLS (`DATABASE_SSL_CA`)
+
+The documented local setup (§1) is **localhost**: `DATABASE_HOST` defaults to
+`127.0.0.1`, and the connection options are only `charset=utf8mb4` plus the
+strict `init_command`. When `DATABASE_SSL_CA` is unset or empty (or
+whitespace-only), the connection behaves exactly as before — nothing changes
+locally, and the SQLite fallback never receives any TLS option.
+
+A **remote** MySQL deployment is a different matter: credentials would cross
+an untrusted network in plaintext unless the connection is TLS-protected.
+If a deployment points `DATABASE_HOST` at a remote server, set
+`DATABASE_SSL_CA` in `.env` to a CA certificate bundle that identifies the
+server. The project config then adds `ssl: {"ca": <path>}` **and an explicit
+`ssl_mode = VERIFY_IDENTITY`** to the MySQL client options: the connection
+must be encrypted, the server certificate chain is verified against the
+given CA, and the certificate's **hostname** is verified too. `VERIFY_CA`
+(and the bare legacy `ssl` dict, which only verifies the chain) are
+deliberately not used, and there is no PREFERRED/REQUIRED/skip-verify
+fallback for this TLS-enabled configuration.
+
+What still must be configured separately by whoever deploys (not in code):
+
+- MySQL users/grants for the remote host (§1's `'…'@'localhost'` user cannot
+  log in remotely).
+- Network/firewall access to the MySQL port.
+- The CA bundle file itself, plus any server certificate expiry/rotation.
+- Mutual TLS (client certificates) is **not** configured by this project;
+  add it only if the database host actually requires it.
+
+Confirm the composed client options without connecting:
+
+```powershell
+python manage.py shell -c "from django.conf import settings; print(settings.DATABASES['default']['OPTIONS'])"
+# local:  {'charset': 'utf8mb4', 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"}
+# remote: same dict plus 'ssl': {'ca': <DATABASE_SSL_CA path>}
+#              and 'ssl_mode': 'VERIFY_IDENTITY'
+```
+
+Note: TLS behavior against a **real remote server** has not been exercised —
+no provider/host exists yet. These options are the documented mechanism;
+remote deployment testing is part of the hosting decision (see
+`docs/decisions.md` open issues).
