@@ -12,10 +12,13 @@ class UserAdmin(BaseUserAdmin):
     """UserAdmin adapted for email-based login with privilege-escalation guards.
 
     Security boundaries for non-superuser ADMINs:
-    - is_superuser / is_staff / groups / user_permissions are hidden/disabled.
-    - Role cannot be changed by a non-superuser via the admin UI.
+    - User-add is permission-gated on ``accounts.add_user`` (not on staff status).
+    - is_superuser / is_staff / role / groups / user_permissions cannot be
+      changed by a non-superuser, even through a forged POST: persisted
+      values are re-asserted server-side around the save.
+    - On delegated (non-superuser) add, is_staff/is_superuser are forced off
+      and the Administrator role is not provisionable.
     - Superuser accounts are hidden from non-superuser changelists.
-    - Non-superusers cannot create accounts with is_staff=True or is_superuser=True.
     - Superusers retain full management capability.
     """
 
@@ -72,31 +75,61 @@ class UserAdmin(BaseUserAdmin):
         return qs
 
     # ------------------------------------------------------------------
-    # FORMFIELDS: disable privileged fields for non-superuser admins
-    #            (server-side enforcement; UI greyed-out + save_model strips)
+    # FORMFIELDS: disable privileged fields for non-superuser admins.
+    #            Disabled fields are a UX affordance only — the authoritative
+    #            server-side enforcement lives in save_model()/save_related().
     # ------------------------------------------------------------------
+    def _is_add_view(self, request):
+        match = getattr(request, "resolver_match", None)
+        return bool(match) and match.url_name == (
+            f"{self.opts.app_label}_{self.opts.model_name}_add"
+        )
+
     def formfield_for_dbfield(self, db_field, request, **kwargs):
-        if db_field.name == "is_staff" and not request.user.is_superuser:
-            kwargs["disabled"] = True
-        if db_field.name == "is_superuser" and not request.user.is_superuser:
-            kwargs["disabled"] = True
-        if db_field.name == "groups" and not request.user.is_superuser:
-            kwargs["disabled"] = True
-        if db_field.name == "user_permissions" and not request.user.is_superuser:
-            kwargs["disabled"] = True
-        if db_field.name == "role" and not request.user.is_superuser:
-            kwargs["disabled"] = True
+        if not request.user.is_superuser:
+            if db_field.name in ("is_staff", "is_superuser", "groups", "user_permissions"):
+                kwargs["disabled"] = True
+            if db_field.name == "role":
+                if self._is_add_view(request):
+                    # Delegated provisioning may not select the Administrator
+                    # role — restrict the rendered choices instead of silently
+                    # downgrading the save.
+                    kwargs["choices"] = [
+                        choice
+                        for choice in db_field.get_choices(include_blank=False)
+                        if choice[0] != User.Role.ADMIN
+                    ]
+                else:
+                    kwargs["disabled"] = True
         return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+    def get_changeform_initial_data(self, request):
+        """Make the disabled add-form flags validate for delegated admins.
+
+        Disabled boolean fields validate against the form's initial dict; on
+        the add view a non-superuser must be able to submit the form, so an
+        explicit False initial is supplied (save_model forces them anyway).
+        """
+        initial = super().get_changeform_initial_data(request)
+        if not request.user.is_superuser and self._is_add_view(request):
+            initial.setdefault("is_staff", False)
+            initial.setdefault("is_superuser", False)
+        return initial
 
     # ------------------------------------------------------------------
     # PERMISSIONS: server-side enforcement
     # ------------------------------------------------------------------
     def has_add_permission(self, request):
-        if request.user.is_superuser:
-            return True
-        # Non-superusers can access the add page but will be restricted
-        # by save_model and the disabled form fields.
-        return True
+        """User creation is permission-gated (Option A, ADR-012).
+
+        Policy: superusers always may add; non-superusers may add only when
+        they hold the ``accounts.add_user`` model permission (the
+        "Administrator" role group is granted it by ``sync_roles``). Staff
+        status alone is never a grant. A denied request raises
+        PermissionDenied inside Django's changeform handler before any row
+        is created.
+        """
+        return request.user.is_superuser or request.user.has_perm("accounts.add_user")
 
     def has_change_permission(self, request, obj=None):
         # Allow the change view to run for all eligible users;
@@ -116,21 +149,54 @@ class UserAdmin(BaseUserAdmin):
         return super().has_delete_permission(request, obj)
 
     # ------------------------------------------------------------------
-    # SAVE MODEL: strip privileged flags ONLY if non-superuser explicitly
-    #             tries to grant them (preserve current values otherwise,
-    #             e.g. disabled fields submit the current value)
+    # SAVE: server-side enforcement of protected values.
+    #      A malicious POST is never assumed safe because a field is disabled
+    #      in the rendered HTML. For non-superuser change requests the
+    #      persisted role/is_staff/is_superuser are read back from the DB and
+    #      re-asserted on the instance before it is saved, and the persisted
+    #      groups/user_permissions relations are snapshotted and re-applied
+    #      after Django's M2M save phase — forged form values can therefore
+    #      never overwrite them, and existing rows/relations are never
+    #      erased. On delegated add, staff/superuser flags are forced off.
     # ------------------------------------------------------------------
+    def _protected_snapshot(self, request, obj):
+        """Persisted protected values for ``obj`` read fresh from the DB."""
+        trusted = User.objects.filter(pk=obj.pk)
+        row = trusted.values("role", "is_staff", "is_superuser").first()
+        if row is None:
+            return None
+        fresh = trusted.get()
+        return {
+            "role": row["role"],
+            "is_staff": row["is_staff"],
+            "is_superuser": row["is_superuser"],
+            "groups": [pk for pk, in fresh.groups.values_list("pk")],
+            "user_permissions": [pk for pk, in fresh.user_permissions.values_list("pk")],
+        }
+
     def save_model(self, request, obj, form, change):
         if not request.user.is_superuser:
-            # Only strip is_staff if the non-superuser is explicitly trying to
-            # grant it (form value True and different from current object value)
-            if form.cleaned_data.get("is_staff") is True and form.cleaned_data["is_staff"] != obj.is_staff:
+            if change:
+                snapshot = self._protected_snapshot(request, obj)
+                if snapshot is None:
+                    raise Http404("User not found")
+                obj.role = snapshot["role"]
+                obj.is_staff = snapshot["is_staff"]
+                obj.is_superuser = snapshot["is_superuser"]
+            else:
                 obj.is_staff = False
-            # Only strip is_superuser if the non-superuser is explicitly trying
-            # to grant it (form value True and different from current object value)
-            if form.cleaned_data.get("is_superuser") is True and form.cleaned_data["is_superuser"] != obj.is_superuser:
                 obj.is_superuser = False
         super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        reclaim = None
+        if not request.user.is_superuser and change:
+            # Snapshot BEFORE Django saves the (post-)form M2M values.
+            reclaim = self._protected_snapshot(request, form.instance)
+        super().save_related(request, form, formsets, change)
+        if reclaim is not None:
+            form.instance.groups.set(reclaim["groups"])
+            form.instance.user_permissions.set(reclaim["user_permissions"])
 
     # ------------------------------------------------------------------
     # CHANGE VIEW: block non-superusers from editing superuser accounts
