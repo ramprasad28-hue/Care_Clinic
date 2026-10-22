@@ -13,7 +13,7 @@ DEBUG = False
 # --- Production static files ---
 STORAGES = {
     "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "BACKEND": "clinic.storage.CloudinaryMediaStorage",
     },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",

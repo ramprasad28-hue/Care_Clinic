@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "appointments.apps.AppointmentsConfig",
     "dashboards.apps.DashboardsConfig",
     "website.apps.WebsiteConfig",
+    "cloudinary",
 ]
 
 MIDDLEWARE = [

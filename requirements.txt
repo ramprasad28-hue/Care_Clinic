@@ -39,3 +39,4 @@ pip-audit>=2.7,<3.0
 
 gunicorn>=26.2,<27
 whitenoise>=6.12,<7
+cloudinary>=1.44,<2
