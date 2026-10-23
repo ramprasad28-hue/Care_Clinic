@@ -21,8 +21,9 @@ from datetime import date, timedelta
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import Http404, HttpResponseNotAllowed, JsonResponse
-from django.urls import path
+from django.http import Http404, HttpResponseNotAllowed, HttpResponseRedirect, JsonResponse
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
@@ -143,13 +144,39 @@ class ImageWarningAdminMixin:
             self.message_user(request, warning, level=messages.WARNING)
 
 
-class AvailabilityRuleInline(admin.TabularInline):
+class AdministratorOnlyInline:
+    """Inline formsets follow the administrator-only rule.
+
+    The default InlineModelAdmin permission checks rely on Django's model
+    permission rows, which role-ADMIN staff do not have (only superusers
+    do). Without this explicit override, the schedule inlines silently
+    disappear for those administrators, and calendar drafts on the add page
+    would have no rows to sync into.
+    """
+
+    def _inline_allowed(self, request, obj=None):
+        return _is_administrator(request.user)
+
+    def has_add_permission(self, request, obj=None):
+        return self._inline_allowed(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        return self._inline_allowed(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._inline_allowed(request, obj)
+
+    def has_view_permission(self, request, obj=None):
+        return self._inline_allowed(request, obj)
+
+
+class AvailabilityRuleInline(AdministratorOnlyInline, admin.TabularInline):
     model = AvailabilityRule
     extra = 1
     fields = ("weekday", "start_time", "end_time", "slot_length_minutes", "is_active")
 
 
-class DoctorLeaveInline(admin.TabularInline):
+class DoctorLeaveInline(AdministratorOnlyInline, admin.TabularInline):
     model = DoctorLeave
     extra = 1
     fields = ("start_date", "end_date", "reason")
@@ -548,8 +575,78 @@ class DoctorAdmin(ImageWarningAdminMixin, AdministratorOnlyMixin, admin.ModelAdm
         return obj.user.is_active
 
 
+class ScheduleHubAdminMixin:
+    """Calendar-first landing pages for the schedule-related changelist views.
+
+    Administrators land on a shared calendar hub that drives the DoctorAdmin
+    scheduling endpoints (single source of truth); ``?table=1`` (or a link on
+    the hub) still opens the classical table. Doctors keep the ordinary,
+    self-scoped table interface and are rejected (403) from the hub, since the
+    hub targets arbitrary doctors.
+    """
+
+    hub_mode = None  # "availability" | "leave"
+
+    def get_urls(self):
+        url_patterns = super().get_urls()
+        info = (self.model._meta.app_label, self.model._meta.model_name)
+        return [
+            path(
+                "schedule/",
+                self.admin_site.admin_view(self.schedule_hub_view),
+                name=f"{info[0]}_{info[1]}_schedule_hub",
+            ),
+            *url_patterns,
+        ]
+
+    def _doctor_choices(self):
+        return [
+            {"id": doctor.pk, "label": doctor.user.get_full_name() or doctor.user.email}
+            for doctor in Doctor.objects.select_related("user").order_by("user__first_name", "user__last_name", "pk")
+        ]
+
+    def schedule_hub_view(self, request):
+        if not _is_administrator(request.user):
+            raise PermissionDenied(_("Only administrators can manage doctor schedules."))
+        try:
+            selected_id = int(request.GET.get("doctor", "") or 0)
+        except ValueError:
+            selected_id = 0
+        selected = Doctor.objects.filter(pk=selected_id).first() if selected_id else None
+        # The widget resolves "/0/" URL segments against the selected doctor at
+        # request time, so a selector switch never rebuilds URLs server-side.
+        context = {
+            **self.admin_site.each_context(request),
+            "title": _("Doctor scheduling"),
+            "cc_mode": self.hub_mode,
+            "cc_doctor": selected,
+            "cc_doctor_choices": self._doctor_choices(),
+            "cc_events_url": reverse("admin:clinic_doctor_schedule_events", args=[selected.pk if selected else 0]),
+            "cc_availability_create_url": reverse("admin:clinic_doctor_schedule_availability_create", args=[selected.pk if selected else 0]),
+            "cc_leave_create_url": reverse("admin:clinic_doctor_schedule_leave_create", args=[selected.pk if selected else 0]),
+            "cc_table_url": reverse(
+                f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist"
+            ) + "?o=1",
+            "opts": self.model._meta,
+        }
+        return TemplateResponse(request, "admin/clinic/schedule_hub.html", context)
+
+    def changelist_view(self, request, extra_context=None):
+        # Any GET parameter (filters, ordering, admin's own "?e=1" error
+        # marker) keeps the classical table; a bare changelist URL lands on
+        # the calendar hub. Custom params cannot be used here: the admin
+        # changelist validates the query string and redirects on unknown
+        # keys (?table=1 would bounce with ?e=1).
+        if _is_administrator(request.user) and not request.GET:
+            info = (self.model._meta.app_label, self.model._meta.model_name)
+            return HttpResponseRedirect(reverse(f"admin:{info[0]}_{info[1]}_schedule_hub"))
+        return super().changelist_view(request, extra_context)
+
+
 @admin.register(AvailabilityRule)
-class AvailabilityRuleAdmin(DoctorOwnedAdminMixin, admin.ModelAdmin):
+class AvailabilityRuleAdmin(ScheduleHubAdminMixin, DoctorOwnedAdminMixin, admin.ModelAdmin):
+    hub_mode = "availability"
+
     list_display = (
         "doctor",
         "weekday",
@@ -566,7 +663,9 @@ class AvailabilityRuleAdmin(DoctorOwnedAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(DoctorLeave)
-class DoctorLeaveAdmin(DoctorOwnedAdminMixin, admin.ModelAdmin):
+class DoctorLeaveAdmin(ScheduleHubAdminMixin, DoctorOwnedAdminMixin, admin.ModelAdmin):
+    hub_mode = "leave"
+
     list_display = ("doctor", "start_date", "end_date", "reason", "created_at")
     list_filter = ("doctor",)
     search_fields = ("doctor__user__email", "reason")

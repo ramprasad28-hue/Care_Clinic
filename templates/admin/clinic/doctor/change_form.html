@@ -1,5 +1,5 @@
 {% extends "admin/change_form.html" %}
-{% load static %}
+{% load static i18n %}
 
 {% block extrastyle %}
     {{ block.super }}
@@ -9,8 +9,28 @@
 {% block after_related_objects %}
     {{ block.super }}
     {% if original and original.pk %}
+        {% url 'admin:clinic_doctor_schedule_events' original.pk as cc_events_url %}
+        {% url 'admin:clinic_doctor_schedule_availability_create' original.pk as cc_availability_create_url %}
+        {% url 'admin:clinic_doctor_schedule_leave_create' original.pk as cc_leave_create_url %}
         {% include "admin/clinic/doctor/schedule_widget.html" %}
+    {% else %}
+        {% url 'admin:clinic_doctor_schedule_events' 0 as cc_events_url %}
+        {% url 'admin:clinic_doctor_schedule_availability_create' 0 as cc_availability_create_url %}
+        {% url 'admin:clinic_doctor_schedule_leave_create' 0 as cc_leave_create_url %}
+        {% with cc_unsaved=True %}
+            {% include "admin/clinic/doctor/schedule_widget.html" %}
+        {% endwith %}
     {% endif %}
+{% endblock %}
+
+{% block inline_field_sets %}
+    <details class="cc-advanced" data-cc-advanced open>
+        <summary>{% translate "Advanced scheduling forms" %}</summary>
+        <p class="cc-advanced__hint">
+            {% translate "The calendar above is the preferred editor for availability rules and leave. These forms stay for edge cases — saving stale values here can overwrite calendar changes." %}
+        </p>
+        {{ block.super }}
+    </details>
 {% endblock %}
 
 {% block footer %}

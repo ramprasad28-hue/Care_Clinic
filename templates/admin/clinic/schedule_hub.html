@@ -1,0 +1,49 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/admin/doctor_schedule_calendar.css' %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+        &rsaquo;
+        <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+        &rsaquo; {{ title }}
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="cc-hub">
+        <form method="get" action="" class="cc-hub__selector" data-cc-doctor-picker>
+            <label class="cc-label" for="cc-doctor-select">{% translate "Doctor" %}</label>
+            <select id="cc-doctor-select" name="doctor" data-doctor-select class="cc-select">
+                {% if not cc_doctor %}{% if cc_doctor_choices %}
+                    <option value="" disabled selected>{% translate "Choose a doctor to view their schedule" %}</option>
+                {% endif %}{% endif %}
+                {% for choice in cc_doctor_choices %}
+                    <option value="{{ choice.id }}" {% if cc_doctor and choice.id == cc_doctor.pk %}selected{% endif %}>
+                        {{ choice.label }}
+                    </option>
+                {% empty %}
+                    <option value="" disabled selected>{% translate "No doctors yet" %}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        {% include "admin/clinic/doctor/schedule_widget.html" %}
+
+        <p class="cc-hub__fallback">
+            <a href="{{ cc_table_url }}">
+                {% translate "View the classical table view instead" %}
+            </a>
+        </p>
+    </div>
+{% endblock %}
+
+{% block footer %}
+    {{ block.super }}
+    <script src="{% static 'js/admin/doctor_schedule_calendar.js' %}" defer></script>
+{% endblock %}

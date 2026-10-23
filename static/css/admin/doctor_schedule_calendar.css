@@ -8,7 +8,15 @@
  * All selectors are namespaced under .cc-calendar / .cc-dialog so they cannot
  * leak into other admin pages.
  */
-.cc-calendar {
+/* Design tokens live on :root, not on .cc-calendar: the <dialog> elements and
+ * the schedule-hub doctor <select> are siblings of .cc-calendar, and custom
+ * properties do not resolve across sibling boundaries. When the tokens were
+ * scoped to .cc-calendar every dialog/select reference was "invalid at
+ * computed-value time", which is what made the menus, dialogs and doctor
+ * selector render transparent. The --cc-* namespace is exclusive to this
+ * stylesheet so a :root declaration cannot leak into other admin CSS.
+ */
+:root {
     --cc-primary: #0EA5A8;
     --cc-primary-dark: #0B7C80;
     --cc-primary-soft: #E8F8F8;
@@ -20,7 +28,9 @@
     --cc-surface: #FFFFFF;
     --cc-radius: 10px;
     --cc-shadow: 0 1px 3px rgba(31, 41, 55, 0.12);
+}
 
+.cc-calendar {
     margin: 1.5rem 0;
     padding: 1.25rem;
     background: var(--cc-surface);
@@ -455,19 +465,42 @@
 /* ---------------------------------------------------------------
  * Dialogs + forms
  * --------------------------------------------------------------- */
+/* Dialogs are native <dialog> elements shown with showModal(), so the browser
+ * top layer already guarantees stacking above the calendar and admin chrome.
+ * Re-declaring the shared --cc-* tokens HERE re-tints every descendant control
+ * (inputs, labels, ghost buttons, details rows) to the dark popover palette
+ * without duplicating rules. The result is a fully opaque, bordered panel so
+ * calendar grid lines and events can never bleed through.
+ */
 .cc-dialog {
-    border: none;
+    --cc-text: #F3F4F6;
+    --cc-text-muted: #9CA3AF;
+    --cc-border: #374151;
+    --cc-surface: #111827;
+    --cc-primary-soft: rgba(14, 165, 168, 0.18);
+    --cc-warning: #FBBF24;
+    --cc-warning-soft: rgba(251, 191, 36, 0.16);
+    --cc-shadow: 0 20px 45px rgba(2, 6, 23, 0.55);
+
+    border: 1px solid var(--cc-border);
     border-radius: var(--cc-radius);
     padding: 1.25rem;
     background: var(--cc-surface);
     color: var(--cc-text);
-    box-shadow: 0 10px 30px rgba(31, 41, 55, 0.25);
+    box-shadow: var(--cc-shadow);
     min-width: min(30rem, calc(100vw - 2rem));
     max-width: calc(100vw - 2rem);
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+    color-scheme: dark; /* dark native popups/pickers inside the dialog */
 }
 
+/* Dim + blur the calendar behind the dialog; the dialog itself is the only
+ * fully opaque layer, so it remains readable over any grid content.
+ */
 .cc-dialog::backdrop {
-    background: rgba(31, 41, 55, 0.45);
+    background: rgba(9, 14, 26, 0.6);
+    backdrop-filter: blur(2px);
 }
 
 .cc-dialog h3 {
@@ -486,13 +519,47 @@
     padding: 0.5rem 0.75rem;
     border-radius: 6px;
     background: var(--cc-primary-soft);
-    color: var(--cc-primary-dark);
+    color: #E8F8F8;
     font-size: 0.82rem;
 }
 
 .cc-dialog__note--recurring {
     border: 1px solid var(--cc-primary);
     font-weight: 600;
+}
+
+/* Buttons inside dialogs: generic .cc-btn hover state is tuned for the light
+ * calendar surface, so re-tune it here for the dark popover. The teal primary
+ * button already carries white text in both its states.
+ */
+.cc-dialog .cc-btn:hover {
+    border-color: var(--cc-primary);
+    color: #E8F8F8;
+}
+
+.cc-dialog .cc-btn--danger {
+    border-color: #DC2626;
+    color: #FCA5A5;
+}
+
+/* Native dropdown lists inherit their own popup styling, not select colors:
+ * set them explicitly so weekday/doctor options keep the dark panel scheme.
+ * Browsers that ignore option styling (older Safari) still fall back to their
+ * own readable defaults.
+ */
+.cc-dialog option,
+.cc-hub__selector select option {
+    background: #111827;
+    color: #F3F4F6;
+}
+
+.cc-hub__selector select option:checked {
+    background: var(--cc-primary-dark);
+    color: #FFFFFF;
+}
+
+.cc-hub__selector select option:disabled {
+    color: #6B7280;
 }
 
 .cc-form-grid {
@@ -583,6 +650,108 @@
 }
 
 /* ---------------------------------------------------------------
+ * Hub pages + advanced disclosure + draft chips
+ * (shared by the schedule hubs and the doctor add/change pages)
+ * --------------------------------------------------------------- */
+.cc-hub {
+    max-width: 72rem;
+    padding: 0 1rem 2rem;
+}
+
+.cc-hub__selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    margin: 0 0 1rem;
+}
+
+.cc-hub__selector .cc-label {
+    padding-top: 0;
+    margin: 0;
+}
+
+.cc-hub__selector select {
+    min-width: 16rem;
+    max-width: 100%;
+}
+
+/* Doctor selector: always the dark popover palette (matching the dialogs) so
+ * it reads cleanly against both light and dark admin chrome. color-scheme
+ * makes the browser render the native popup in the dark scheme where
+ * supported; option styling above covers Chromium/Firefox popup lists.
+ */
+.cc-hub__selector .cc-select {
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #F3F4F6;
+    font-weight: 600;
+    color-scheme: dark;
+}
+
+.cc-hub__selector .cc-select:hover {
+    border-color: var(--cc-primary);
+}
+
+.cc-hub__selector .cc-select:focus-visible {
+    outline: 3px solid var(--cc-primary);
+    outline-offset: 1px;
+    border-color: var(--cc-primary);
+}
+
+.cc-hub__fallback {
+    margin-top: 1rem;
+    font-size: 0.85rem;
+}
+
+/* Availability/leave hub entries highlight related event kinds. */
+.cc-calendar--availability .cc-event--availability,
+.cc-calendar--availability .cc-chip--availability {
+    box-shadow: 0 0 0 2px var(--cc-primary-soft);
+}
+
+.cc-calendar--leave .cc-event--leave,
+.cc-calendar--leave .cc-chip--leave {
+    box-shadow: 0 0 0 2px var(--cc-warning-soft);
+}
+
+details[data-cc-advanced] {
+    margin: 1rem 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius);
+    background: var(--cc-surface);
+}
+
+details[data-cc-advanced] > summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--cc-text);
+}
+
+details[data-cc-advanced] > summary:focus-visible {
+    outline: 3px solid var(--cc-primary);
+    outline-offset: 2px;
+}
+
+details[data-cc-advanced] > p.cc-advanced__hint {
+    margin: 0.6rem 0 0;
+    font-size: 0.82rem;
+    color: var(--cc-text-muted);
+}
+
+/* Unsaved drafts (add-doctor page): dashed outline marks client-only data. */
+.cc-event--draft {
+    border-style: dashed;
+}
+
+.cc-chip--draft {
+    background: var(--cc-surface);
+    border: 1px dashed var(--cc-text-muted);
+}
+
+/* ---------------------------------------------------------------
  * Responsive
  * --------------------------------------------------------------- */
 @media (max-width: 48rem) {
@@ -597,10 +766,19 @@
     .cc-day { min-height: 4.2rem; }
     .cc-timegrid { max-height: 64vh; }
     .cc-range-label { order: -1; width: 100%; text-align: left; }
+
+    /* Dialogs keep their padded content inside narrow viewports; the action
+     * buttons wrap instead of overflowing horizontally.
+     */
+    .cc-dialog {
+        padding: 1rem;
+        min-width: calc(100vw - 1.5rem);
+        max-width: calc(100vw - 1.5rem);
+    }
 }
 
 @media (prefers-color-scheme: dark) {
-    .cc-calendar {
+    :root {
         --cc-text: #F3F4F6;
         --cc-text-muted: #9CA3AF;
         --cc-border: #374151;

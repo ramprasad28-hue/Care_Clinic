@@ -1,11 +1,25 @@
 /**
  * Doctor schedule calendar ("Google Calendar"-style) for the Care_Clinic
- * doctor admin change page. No dependencies, no build step (ADR-020).
+ * doctor admin. No dependencies, no build step (ADR-020).
+ *
+ * One widget, three entry points (all fields are parameterized in
+ * schedule_widget.html):
+ *
+ *  - Doctor change page (saved doctor): concrete endpoint URLs; every
+ *    calendar write is mirrored into the matching inline formset row so a
+ *    later main-form save can never post stale values over it.
+ *  - Doctor add page (unsaved draft mode, data-unsaved="true"): rules and
+ *    leaves are client-side drafts; they are synced into the availability /
+ *    leave inline formsets right before the doctor form submits, and are
+ *    re-imported from the rows after a failed validation round-trip.
+ *  - Schedule hub pages (AvailabilityRule / DoctorLeave changelist views):
+ *    a doctor selector drives a scoped `/0/` URL sentinel — the JS resolves
+ *    the "/0/" segment against the currently selected doctor at request time.
  *
  * Responsibilities:
  *  - Month / week / day views with prev-next-today navigation and period label.
  *  - Availability rules are RECURRING: the server expands them into concrete
- *    date occurrences; the client only renders.
+ *    date occurrences; the client only renders (drafts expand client-side).
  *  - Doctor leave renders as date-specific ranges (single- and multi-day).
  *  - Clicking an empty day/cell opens an add menu; clicking an event chip
  *    opens details (edit / activate-deactivate / delete with confirmation).
@@ -21,7 +35,7 @@
     "use strict";
 
     var root = document.getElementById("cc-calendar");
-    if (!root) return; // Add page (no saved Doctor id): inline formsets only.
+    if (!root) return;
 
     var HOUR_START = 7;
     var HOUR_END = 21; // exclusive: hour rows 07:00..20:00
@@ -52,6 +66,7 @@
         detailsNote: document.querySelector("[data-details-note]"),
         confirmDialog: document.getElementById("cc-confirm"),
         confirmText: document.querySelector("[data-confirm-text]"),
+        doctorName: root.querySelector("[data-doctor-name]"),
     };
 
     var eventsUrl = root.getAttribute("data-events-url");
@@ -71,7 +86,13 @@
         context: null,   // { date, start, end } from a cell click
         busy: false,
         saving: false,
+        unsaved: root.getAttribute("data-unsaved") === "true",
+        doctorId: null,  // target doctor; null = none selected (hub) / not saved
+        draftRules: [],  // unsaved-mode rule entries (negative ids)
+        draftLeaves: [], // unsaved-mode leave entries (negative ids)
     };
+    var doctorAttr = root.getAttribute("data-doctor");
+    if (doctorAttr && /^\d+$/.test(doctorAttr)) state.doctorId = Number(doctorAttr);
     var statusTimer = null;
 
     // ------------------------------------------------------------------
@@ -167,6 +188,7 @@
     // API
     // ------------------------------------------------------------------
     function request(url, options) {
+        options = options || {};
         if (state.busy) return Promise.resolve(undefined);
         setBusy(true);
         var init = {
@@ -225,9 +247,84 @@
     // ------------------------------------------------------------------
     // URL endpoints derived from the create URLs
     // ------------------------------------------------------------------
+    function scopedUrl(url) {
+        // Sentinel "/0/" (hub pages, add page) resolves against the currently
+        // selected doctor; concrete URLs (change page) pass through.
+        if (url === null || url === undefined) return url;
+        if (state.doctorId === null) return url;
+        var marker = "/0/";
+        var at = url.indexOf(marker);
+        if (at === -1) return url;
+        return url.slice(0, at) + "/" + state.doctorId + "/" + url.slice(at + marker.length);
+    }
+
     function scheduleUrl(kind, action, id) {
-        var base = createUrls[kind]; // .../availability/create/ or .../leave/create/
+        var base = scopedUrl(createUrls[kind]); // .../availability/create/ or .../leave/create/
         return base.replace(/\/create\/$/, "/" + id + "/" + action + "/");
+    }
+
+    // ------------------------------------------------------------------
+    // Unsaved-draft mode (add-doctor page)
+    // ------------------------------------------------------------------
+    function draftRuleEntry(weekday, start, end, slot, isActive, id) {
+        return {
+            id: id === undefined ? null : id,
+            weekday: weekday,
+            weekday_label: WEEKDAY_LABELS[Number(weekday)],
+            start: start,
+            end: end,
+            slot_length_minutes: slot,
+            is_active: !!isActive,
+        };
+    }
+
+    function draftLeaveEntry(startDate, endDate, reason, id) {
+        return {
+            id: id === undefined ? null : id,
+            start_date: startDate,
+            end_date: endDate,
+            reason: reason || "",
+        };
+    }
+
+    function findDraft(kind, id) {
+        var list = kind === "availability" ? state.draftRules : state.draftLeaves;
+        return list.find(function (entry) { return String(entry.id) === String(id); });
+    }
+
+    function removeDraft(kind, id) {
+        var list = kind === "availability" ? state.draftRules : state.draftLeaves;
+        state[kind === "availability" ? "draftRules" : "draftLeaves"] = list.filter(function (entry) {
+            return String(entry.id) !== String(id);
+        });
+    }
+
+    function draftIdCounter() {
+        state.nextDraftId = (state.nextDraftId === undefined) ? -1 : state.nextDraftId - 1;
+        return state.nextDraftId;
+    }
+
+    function loadDrafts(range) {
+        state.rules = state.draftRules;
+        state.leaves = state.draftLeaves;
+        state.occurrences = {};
+        var day = new Date(range.start);
+        while (day.getTime() <= range.end.getTime()) {
+            var key = isoDate(day);
+            state.draftRules.forEach(function (rule) {
+                if (Number(rule.weekday) !== weekdayIndex(day)) return;
+                state.occurrences[key] = state.occurrences[key] || [];
+                state.occurrences[key].push({
+                    rule_id: rule.id,
+                    date: key,
+                    start: rule.start,
+                    end: rule.end,
+                    is_active: rule.is_active,
+                });
+            });
+            day = addDays(day, 1);
+        }
+        render();
     }
 
     // ------------------------------------------------------------------
@@ -247,7 +344,18 @@
 
     function loadEvents() {
         var range = visibleRange();
-        var url = eventsUrl + "?start=" + isoDate(range.start) + "&end=" + isoDate(range.end);
+        if (state.unsaved) {
+            loadDrafts(range);
+            return;
+        }
+        if (!eventsUrl || state.doctorId === null) {
+            state.rules = [];
+            state.leaves = [];
+            state.occurrences = {};
+            render();
+            return;
+        }
+        var url = scopedUrl(eventsUrl) + "?start=" + isoDate(range.start) + "&end=" + isoDate(range.end);
         return request(url).then(function (result) {
             if (!result) return;
             if (!result.ok) {
@@ -276,9 +384,13 @@
     }
 
     function render() {
-        if (!haveAnyData()) emptyState();
-        else if (state.view === "month") renderMonth();
+        // Render the active view's grid even when there is nothing stored yet:
+        // every empty day/cell is clickable, which is how the first rule for a
+        // doctor is created. The empty diagnose note is only appended when no
+        // scheduling data exists at all.
+        if (state.view === "month") renderMonth();
         else renderTimeGrid();
+        if (!haveAnyData()) appendEmptyHint();
         updateToolbar();
     }
 
@@ -308,22 +420,31 @@
             " " + MONTH_LABELS[state.anchor.getMonth()].slice(0, 3) + " " + state.anchor.getFullYear();
     }
 
-    function emptyState() {
+    function appendEmptyHint() {
         var wrap = document.createElement("div");
         wrap.className = "cc-empty";
         var strong = document.createElement("strong");
-        strong.textContent = "No availability rules or doctor leave for this doctor yet.";
+        strong.textContent = state.unsaved
+            ? "Draft an availability rule or leave below — nothing is on the server yet."
+            : "No availability rules or doctor leave yet.";
         wrap.appendChild(strong);
         var note = document.createElement("span");
-        note.textContent = "Use \u201CAdd availability\u201D to create a recurring weekly window, or \u201CAdd leave\u201D for specific unavailable dates.";
+        if (state.unsaved) {
+            note.textContent = "Click any day to draft a recurring availability window or leave; drafts are saved together with the doctor form.";
+        } else if (state.doctorId === null) {
+            note.textContent = "Pick a doctor above to view and edit their schedule.";
+        } else {
+            note.textContent = "Click any day to add a recurring availability window or leave, or use the buttons above.";
+        }
         wrap.appendChild(note);
-        els.board.replaceChildren(wrap);
+        els.board.appendChild(wrap);
     }
 
     function makeEventButton(options) {
         var chip = document.createElement("button");
         chip.type = "button";
-        chip.className = "cc-event " + (options.cls || "");
+        chip.className = "cc-event " + (options.cls || "") +
+            (state.unsaved ? " cc-event--draft" : "");
         chip.textContent = options.label;
         chip.addEventListener("click", function (event) {
             event.stopPropagation();
@@ -665,14 +786,50 @@
     // -- Submissions ---------------------------------------------------
     function submitAvailability() {
         var inputs = availabilityInputs();
-        var editingId = state.editing.availability;
         if (!inputs.start.value || !inputs.end.value) {
             showErrors(els.availabilityDialog, {
                 errors: { "__all__": ["Start and end time are required."] },
             });
             return;
         }
-        var url = editingId ? scheduleUrl("availability", "update", editingId) : createUrls.availability;
+        if (state.unsaved) {
+            var draftId = state.editing.availability;
+            if (draftId !== null) {
+                var current = findDraft("availability", draftId);
+                els.availabilityDialog.close();
+                hideDetails();
+                state.editing.availability = null;
+                if (current) {
+                    current.weekday = Number(inputs.weekday.value);
+                    current.weekday_label = WEEKDAY_LABELS[current.weekday];
+                    current.start = inputs.start.value;
+                    current.end = inputs.end.value;
+                    current.slot_length_minutes = inputs.slot.value
+                        ? Number(inputs.slot.value) : null;
+                    current.is_active = inputs.active.checked;
+                    status("Draft updated. It is saved with the doctor form.", "ok");
+                } else {
+                    status("That draft is no longer listed.", "error");
+                }
+                loadEvents();
+                return;
+            }
+            state.draftRules.push(draftRuleEntry(
+                Number(inputs.weekday.value),
+                inputs.start.value,
+                inputs.end.value,
+                inputs.slot.value ? Number(inputs.slot.value) : null,
+                inputs.active.checked,
+                draftIdCounter()
+            ));
+            els.availabilityDialog.close();
+            state.editing.availability = null;
+            status("Draft added — it is saved together with the new doctor.", "ok");
+            loadEvents();
+            return;
+        }
+        var editingId = state.editing.availability;
+        var url = editingId ? scheduleUrl("availability", "update", editingId) : scopedUrl(createUrls.availability);
         setDialogBusy(els.availabilityDialog, true);
         var payload = {
             weekday: inputs.weekday.value,
@@ -687,6 +844,9 @@
                 els.availabilityDialog.close();
                 hideDetails();
                 state.editing.availability = null;
+                if (result.payload && result.payload.rule) {
+                    mirrorRuleIntoInline(result.payload.rule);
+                }
                 status(
                     editingId
                         ? "Availability updated (still repeating weekly)."
@@ -703,7 +863,36 @@
     function submitLeave() {
         var inputs = leaveInputs();
         var editingId = state.editing.leave;
-        var url = editingId ? scheduleUrl("leave", "update", editingId) : createUrls.leave;
+        if (state.unsaved) {
+            if (editingId !== null) {
+                var current = findDraft("leave", editingId);
+                els.leaveDialog.close();
+                hideDetails();
+                state.editing.leave = null;
+                if (current) {
+                    current.start_date = inputs.start.value;
+                    current.end_date = inputs.end.value;
+                    current.reason = inputs.reason.value;
+                    status("Draft updated. It is saved with the doctor form.", "ok");
+                } else {
+                    status("That draft is no longer listed.", "error");
+                }
+                loadEvents();
+                return;
+            }
+            state.draftLeaves.push(draftLeaveEntry(
+                inputs.start.value,
+                inputs.end.value,
+                inputs.reason.value,
+                draftIdCounter()
+            ));
+            els.leaveDialog.close();
+            state.editing.leave = null;
+            status("Draft added — it is saved together with the new doctor.", "ok");
+            loadEvents();
+            return;
+        }
+        var url = editingId ? scheduleUrl("leave", "update", editingId) : scopedUrl(createUrls.leave);
         setDialogBusy(els.leaveDialog, true);
         postForm(url, {
             start_date: inputs.start.value,
@@ -715,6 +904,9 @@
                 els.leaveDialog.close();
                 hideDetails();
                 state.editing.leave = null;
+                if (result.payload && result.payload.leave) {
+                    mirrorLeaveIntoInline(result.payload.leave);
+                }
                 status(editingId ? "Leave updated." : "Leave added.", "ok");
                 loadEvents();
             } else {
@@ -747,7 +939,9 @@
                 [
                     "Slot duration",
                     rule.slot_length_minutes === null || rule.slot_length_minutes === undefined
-                        ? "Doctor default (" + rule.effective_slot_length_minutes + " min)"
+                        ? (rule.effective_slot_length_minutes
+                            ? "Doctor default (" + rule.effective_slot_length_minutes + " min)"
+                            : "Doctor default")
                         : rule.slot_length_minutes + " min",
                 ],
                 ["Repeats", "Weekly — appears on every " + rule.weekday_label],
@@ -820,6 +1014,18 @@
         var rule = target && target.kind === "availability" ? findRule(target.id) : null;
         if (!rule) { hideDetails(); return; }
         var activate = !rule.is_active;
+        if (state.unsaved && Number(rule.id) < 0) {
+            rule.is_active = activate;
+            hideDetails();
+            status(
+                activate
+                    ? "Draft activated (will be bookable once saved)."
+                    : "Draft deactivated (won't be bookable).",
+                "ok"
+            );
+            loadEvents();
+            return;
+        }
         setDialogBusy(els.detailsDialog, true);
         var payload = {
             weekday: String(Number(rule.weekday)),
@@ -834,6 +1040,9 @@
             if (!result) return;
             if (result.ok) {
                 hideDetails();
+                if (result.payload && result.payload.rule) {
+                    mirrorRuleIntoInline(result.payload.rule);
+                }
                 status(
                     activate
                         ? "Availability activated (bookable again)."
@@ -861,6 +1070,9 @@
         } else {
             question = "Delete the leave from " + leave.start_date + " to " + leave.end_date + "?";
         }
+        if (state.unsaved && Number(target.id) < 0) {
+            question = "Remove this unsaved draft entry from the doctor form?";
+        }
         els.confirmDialog.dataset.kind = target.kind;
         els.confirmDialog.dataset.editingId = String(target.id);
         els.confirmText.textContent = question + " This cannot be undone.";
@@ -871,6 +1083,14 @@
     function confirmDelete() {
         var kind = els.confirmDialog.dataset.kind;
         var id = els.confirmDialog.dataset.editingId;
+        if (state.unsaved && Number(id) < 0) {
+            removeDraft(kind, id);
+            els.confirmDialog.close();
+            state.selected = null;
+            status("Draft entry removed.", "ok");
+            loadEvents();
+            return;
+        }
         var url = scheduleUrl(kind, "delete", id);
         els.confirmDialog.close();
         postForm(url, {}).then(function (result) {
@@ -878,11 +1098,359 @@
             if (result.ok) {
                 status("Entry deleted. Existing appointments are untouched.", "ok");
                 state.selected = null;
+                mirrorDeleteIntoInline(kind, id);
                 loadEvents();
             } else {
                 status("Could not delete: " + errorText(result.payload), "error");
             }
         });
+    }
+
+    // ------------------------------------------------------------------
+    // Inline formset plumbing
+    //
+    // Draft mode (add page): inline rows are imported into the calendar as
+    // drafts at init and re-imported at submit; all rows are DELETE-marked
+    // and one fresh row per draft is appended right before the doctor form
+    // POSTs, so the server receives exactly one row per draft chip.
+    // Change pages: every calendar write is mirrored into the matching
+    // inline row (update values / check DELETE / append), so a later
+    // main-form save can never post stale values over the calendar change.
+    // ------------------------------------------------------------------
+    var INLINE_PREFIX_AVAILABILITY = "availability_rules";
+    var INLINE_PREFIX_LEAVE = "leaves";
+
+    function inlineFormsetTotal(prefix) {
+        return document.getElementById("id_" + prefix + "-TOTAL_FORMS");
+    }
+
+    function inlineRowByIndex(prefix, index, probeSuffix) {
+        var probe = document.querySelector(
+            '[name="' + prefix + "-" + index + "-" + probeSuffix + '"]'
+        );
+        return probe ? probe.closest("tr") : null;
+    }
+
+    function inlineField(prefix, index, suffix) {
+        return document.querySelector(
+            '[name="' + prefix + "-" + index + "-" + suffix + '"]'
+        );
+    }
+
+    function readInlineAvailability(index) {
+        var row = inlineRowByIndex(INLINE_PREFIX_AVAILABILITY, index, "start_time");
+        if (!row) return null;
+        var weekday = function (suffix) {
+            var field = inlineField(INLINE_PREFIX_AVAILABILITY, index, suffix);
+            return field ? field.value : "";
+        };
+        var start = weekday("start_time");
+        var end = weekday("end_time");
+        var weekdayValue = weekday("weekday");
+        if (!weekdayValue && !start && !end) return null;
+        var slot = weekday("slot_length_minutes");
+        var activeField = inlineField(INLINE_PREFIX_AVAILABILITY, index, "is_active");
+        return {
+            id: weekday("id"),
+            weekday: weekdayValue === "" ? null : Number(weekdayValue),
+            start_time: start,
+            end_time: end,
+            slot_length_minutes: slot === "" ? null : Number(slot),
+            is_active: activeField ? activeField.checked : true,
+        };
+    }
+
+    function readInlineLeave(index) {
+        var row = inlineRowByIndex(INLINE_PREFIX_LEAVE, index, "start_date");
+        if (!row) return null;
+        var value = function (suffix) {
+            var field = inlineField(INLINE_PREFIX_LEAVE, index, suffix);
+            return field ? field.value : "";
+        };
+        var startDate = value("start_date");
+        var endDate = value("end_date");
+        if (!startDate && !endDate) return null;
+        return {
+            id: value("id"),
+            start_date: startDate,
+            end_date: endDate,
+            reason: value("reason"),
+        };
+    }
+
+    function importInlineDrafts() {
+        var availabilityTotal = inlineFormsetTotal(INLINE_PREFIX_AVAILABILITY);
+        if (availabilityTotal) {
+            var seenRules = {};
+            for (var i = 0; i < Number(availabilityTotal.value); i += 1) {
+                var data = readInlineAvailability(i);
+                if (!data) continue;
+                var key = [data.weekday, data.start_time, data.end_time,
+                    data.slot_length_minutes, data.is_active ? 1 : 0].join("|");
+                if (seenRules[key]) continue;
+                seenRules[key] = true;
+                state.draftRules.push(draftRuleEntry(
+                    data.weekday === null ? 0 : data.weekday,
+                    data.start_time,
+                    data.end_time,
+                    data.slot_length_minutes,
+                    data.is_active,
+                    draftIdCounter()
+                ));
+            }
+            adoptInlineRows(INLINE_PREFIX_AVAILABILITY);
+        }
+        var leaveTotal = inlineFormsetTotal(INLINE_PREFIX_LEAVE);
+        if (leaveTotal) {
+            var seenLeaves = {};
+            for (var j = 0; j < Number(leaveTotal.value); j += 1) {
+                var leaveData = readInlineLeave(j);
+                if (!leaveData) continue;
+                var leaveKey = [leaveData.start_date, leaveData.end_date,
+                    leaveData.reason].join("|");
+                if (seenLeaves[leaveKey]) continue;
+                seenLeaves[leaveKey] = true;
+                state.draftLeaves.push(draftLeaveEntry(
+                    leaveData.start_date,
+                    leaveData.end_date,
+                    leaveData.reason,
+                    draftIdCounter()
+                ));
+            }
+            adoptInlineRows(INLINE_PREFIX_LEAVE);
+        }
+    }
+
+    function adoptInlineRows(prefix) {
+        // On add pages every row is unbound (DELETE checkboxes only render
+        // for bound rows), so adoption = removing the row elements entirely;
+        // the submitted content is rebuilt one fresh row per draft instead.
+        var replacement = new RegExp("^" + prefix + "-\\d+$");
+        document.querySelectorAll(
+            '.js-inline-admin-formset tr[id'
+        ).forEach(function (row) {
+            if (replacement.test(row.id)) row.remove();
+        });
+    }
+
+    function appendInlineRow(prefix, newIndex, probeSuffix, fields) {
+        // Prefer Django's own "__prefix__" empty-form template row (always
+        // rendered, contains placeholder names) over cloning a rendered row.
+        var sampleRow =
+            document.querySelector('[id="' + prefix + '-empty"]') ||
+            document.querySelector(".empty-form." + prefix + "-empty") ||
+            document.querySelector('td [name^="' + prefix + '-__prefix__-"]');
+        sampleRow = sampleRow ? sampleRow.closest("tr") : null;
+        if (!sampleRow) {
+            // Fallback: clone an existing rendered row.
+            sampleRow = inlineRowByIndex(prefix, Math.max(0, newIndex - 1), probeSuffix) ||
+                inlineRowByIndex(prefix, 0, probeSuffix);
+            if (!sampleRow || !sampleRow.closest) return false;
+            var clone = sampleRow.cloneNode(true);
+            var sampleIndex = null;
+            clone.querySelectorAll("[name], [id]").forEach(function (field) {
+                ["name", "id", "for", "aria-labelledby", "aria-describedby"].forEach(function (attr) {
+                    var attrValue = field.getAttribute(attr);
+                    if (!attrValue) return;
+                    var match = new RegExp("^(" + prefix + ")-(\\d+)-(.*)$").exec(attrValue);
+                    if (match) sampleIndex = sampleIndex || match[2];
+                    if (sampleIndex !== null) {
+                        field.setAttribute(
+                            attr,
+                            attrValue.replace(
+                                prefix + "-" + sampleIndex + "-",
+                                prefix + "-" + newIndex + "-"
+                            )
+                        );
+                    }
+                });
+            });
+            Object.keys(fields).forEach(function (suffix) {
+                var field = clone.querySelector(
+                    '[name="' + prefix + "-" + newIndex + "-" + suffix + '"]'
+                );
+                if (!field) return;
+                if (field.type === "checkbox") field.checked = !!fields[suffix];
+                else field.value = fields[suffix] === null || fields[suffix] === undefined
+                    ? "" : fields[suffix];
+            });
+            var idField = clone.querySelector('[name="' + prefix + "-" + newIndex + '-id"]');
+            if (idField) idField.value = "";
+            var deleteField = clone.querySelector(
+                '[name="' + prefix + "-" + newIndex + '-DELETE"]'
+            );
+            if (deleteField) deleteField.checked = false;
+            sampleRow.parentNode.insertBefore(clone, sampleRow.nextSibling);
+            return true;
+        }
+
+        var fresh = sampleRow.cloneNode(true);
+        fresh.id = prefix + "-" + newIndex;
+        fresh.classList.remove("empty-form");
+        fresh.querySelectorAll("[name], [id]").forEach(function (field) {
+            ["name", "id", "for", "aria-labelledby", "aria-describedby"].forEach(function (attr) {
+                var attrValue = field.getAttribute(attr);
+                if (attrValue && attrValue.indexOf("__prefix__") !== -1) {
+                    field.setAttribute(
+                        attr, attrValue.replace("__prefix__", String(newIndex))
+                    );
+                }
+            });
+        });
+        Object.keys(fields).forEach(function (suffix) {
+            var field = fresh.querySelector(
+                '[name="' + prefix + "-" + newIndex + "-" + suffix + '"]'
+            );
+            if (!field) return;
+            if (field.type === "checkbox") field.checked = !!fields[suffix];
+            else field.value = fields[suffix] === null || fields[suffix] === undefined
+                ? "" : fields[suffix];
+        });
+        var freshId = fresh.querySelector('[name="' + prefix + "-" + newIndex + '-id"]');
+        if (freshId) freshId.value = "";
+        var freshDelete = fresh.querySelector(
+            '[name="' + prefix + "-" + newIndex + '-DELETE"]'
+        );
+        if (freshDelete) freshDelete.checked = false;
+        sampleRow.parentNode.insertBefore(fresh, sampleRow);
+        return true;
+    }
+
+    function appendAvailabilityRow(rule, newIndex) {
+        return appendInlineRow(INLINE_PREFIX_AVAILABILITY, newIndex, "start_time", {
+            weekday: String(rule.weekday),
+            start_time: rule.start,
+            end_time: rule.end,
+            slot_length_minutes:
+                rule.slot_length_minutes === null || rule.slot_length_minutes === undefined
+                    ? "" : String(rule.slot_length_minutes),
+            is_active: !!rule.is_active,
+        });
+    }
+
+    function appendLeaveRow(leave, newIndex) {
+        return appendInlineRow(INLINE_PREFIX_LEAVE, newIndex, "start_date", {
+            start_date: leave.start_date,
+            end_date: leave.end_date,
+            reason: leave.reason || "",
+        });
+    }
+
+    function syncDraftsToInlines() {
+        // Draft rows replace the DOM rows entirely: adopt (remove) all
+        // current unbound rows, then append exactly one fresh row per draft.
+        // Management forms are renumbered to match, so the server receives
+        // one row per draft chip and nothing else.
+        var availabilityTotal = inlineFormsetTotal(INLINE_PREFIX_AVAILABILITY);
+        if (availabilityTotal) {
+            adoptInlineRows(INLINE_PREFIX_AVAILABILITY);
+            var availabilityIndex = 0;
+            state.draftRules.forEach(function (rule) {
+                if (appendAvailabilityRow(rule, availabilityIndex)) {
+                    availabilityIndex += 1;
+                }
+            });
+            availabilityTotal.value = String(availabilityIndex);
+        }
+        var leaveTotal = inlineFormsetTotal(INLINE_PREFIX_LEAVE);
+        if (leaveTotal) {
+            adoptInlineRows(INLINE_PREFIX_LEAVE);
+            var leaveIndex = 0;
+            state.draftLeaves.forEach(function (leave) {
+                if (appendLeaveRow(leave, leaveIndex)) {
+                    leaveIndex += 1;
+                }
+            });
+            leaveTotal.value = String(leaveIndex);
+        }
+    }
+
+    // -- Change pages: mirror calendar writes into inline rows ---------
+    function findInlineRowById(prefix, recordId) {
+        var row = null;
+        document.querySelectorAll(
+            '[name^="' + prefix + '-"][name$="-id"]'
+        ).forEach(function (field) {
+            if (row || field.value === "" || field.value !== String(recordId)) return;
+            row = field.closest("tr");
+        });
+        return row;
+    }
+
+    function mirrorRuleIntoInline(rule) {
+        if (state.unsaved) return;
+        var total = inlineFormsetTotal(INLINE_PREFIX_AVAILABILITY);
+        if (!total) return; // hub pages have no inline formsets
+        var row = findInlineRowById(INLINE_PREFIX_AVAILABILITY, rule.id);
+        if (!row) {
+            // Rules created through the calendar are already saved; the main
+            // form must not recreate them, so there is nothing to mirror.
+            return;
+        }
+        var index = null;
+        row.querySelectorAll("[name]").forEach(function (field) {
+            var match = new RegExp(
+                "^" + INLINE_PREFIX_AVAILABILITY + "-(\\d+)-"
+            ).exec(field.name);
+            if (match) index = match[1];
+        });
+        if (index === null) return;
+        var updates = {
+            "weekday": String(rule.weekday),
+            "start_time": rule.start,
+            "end_time": rule.end,
+            "slot_length_minutes":
+                rule.slot_length_minutes === null || rule.slot_length_minutes === undefined
+                    ? "" : String(rule.slot_length_minutes),
+        };
+        Object.keys(updates).forEach(function (suffix) {
+            var field = inlineField(INLINE_PREFIX_AVAILABILITY, index, suffix);
+            if (field) field.value = updates[suffix];
+        });
+        var activeField = inlineField(INLINE_PREFIX_AVAILABILITY, index, "is_active");
+        if (activeField) activeField.checked = !!rule.is_active;
+        var deleteField = inlineField(INLINE_PREFIX_AVAILABILITY, index, "DELETE");
+        if (deleteField) deleteField.checked = false;
+    }
+
+    function mirrorLeaveIntoInline(leave) {
+        if (state.unsaved) return;
+        var total = inlineFormsetTotal(INLINE_PREFIX_LEAVE);
+        if (!total) return;
+        var row = findInlineRowById(INLINE_PREFIX_LEAVE, leave.id);
+        if (!row) {
+            // Same as availability: calendar-created leaves are already saved.
+            return;
+        }
+        var rowIndex = null;
+        row.querySelectorAll("[name]").forEach(function (field) {
+            var match = new RegExp("^" + INLINE_PREFIX_LEAVE + "-(\\d+)-").exec(field.name);
+            if (match) rowIndex = match[1];
+        });
+        if (rowIndex === null) return;
+        ["start_date", "end_date", "reason"].forEach(function (suffix) {
+            var field = inlineField(INLINE_PREFIX_LEAVE, rowIndex, suffix);
+            if (field) field.value = leave[suffix] || "";
+        });
+        var deleteField = inlineField(INLINE_PREFIX_LEAVE, rowIndex, "DELETE");
+        if (deleteField) deleteField.checked = false;
+    }
+
+    function mirrorDeleteIntoInline(kind, recordId) {
+        if (state.unsaved) return;
+        var prefix = kind === "availability" ? INLINE_PREFIX_AVAILABILITY : INLINE_PREFIX_LEAVE;
+        var total = inlineFormsetTotal(prefix);
+        if (!total) return;
+        var row = findInlineRowById(prefix, recordId);
+        if (!row) return;
+        var prefixIndex = null;
+        row.querySelectorAll("[name]").forEach(function (field) {
+            var match = new RegExp("^" + prefix + "-(\\d+)-").exec(field.name);
+            if (match) prefixIndex = match[1];
+        });
+        if (prefixIndex === null) return;
+        var deleteField = inlineField(prefix, prefixIndex, "DELETE");
+        if (deleteField) deleteField.checked = true;
     }
 
     // ------------------------------------------------------------------
@@ -892,7 +1460,10 @@
         button.addEventListener("click", function () {
             var action = button.getAttribute("data-menu");
             if (action === "availability") {
-                openAvailabilityForm(state.context, null);
+                openAvailabilityForm(
+                    state.context || { date: startOfToday(), start: 9 * 60, end: 13 * 60 },
+                    null
+                );
             } else if (action === "leave") {
                 openLeaveForm(null);
             } else {
@@ -958,12 +1529,51 @@
         openLeaveForm(null);
     });
 
+    // Schedule hub: the doctor selector re-scopes "/0/" sentinels at request
+    // time; a switch stores the choice in the URL for reload persistence.
+    var doctorSelect = document.querySelector("[data-doctor-select]");
+    if (doctorSelect) {
+        doctorSelect.addEventListener("change", function () {
+            var choice = doctorSelect.value;
+            state.doctorId = choice && /^\d+$/.test(choice) ? Number(choice) : null;
+            if (els.doctorName) {
+                var option = doctorSelect.selectedIndex >= 0
+                    ? doctorSelect.options[doctorSelect.selectedIndex] : null;
+                els.doctorName.textContent = state.doctorId === null ? "" : (option ? option.text : "");
+            }
+            try {
+                history.replaceState(
+                    null,
+                    "",
+                    state.doctorId === null ? "?" : "?doctor=" + state.doctorId
+                );
+            } catch (error) { /* environments without history support */ }
+            loadEvents();
+        });
+    }
+
+    // Draft mode (add page): before the doctor form POSTs, rebuild the
+    // inline rows from the draft list — one fresh row per draft, every
+    // pre-existing row DELETE-marked. Import also picks up rows the user
+    // typed directly into the formsets; identical values are deduplicated.
+    if (state.unsaved) {
+        importInlineDrafts();
+        var mainForm = root.closest("form");
+        if (mainForm) {
+            mainForm.addEventListener("submit", function () {
+                if (!state.unsaved) return;
+                importInlineDrafts();
+                syncDraftsToInlines();
+            });
+        }
+    }
+
     // Progressive enhancement: with the calendar active, collapse the
-    // table-based inline formsets on change pages (they remain the full
-    // workflow on the Add-doctor page and without JavaScript).
-    document.querySelectorAll(".js-inline-admin-formset").forEach(function (block) {
-        block.hidden = true;
-    });
+    // "Advanced scheduling forms" disclosure on change pages. The inline
+    // rows stay in the POST payload (they are mirrored to match the
+    // calendar), but they are no longer the primary editing surface.
+    var advanced = document.querySelector("[data-cc-advanced]");
+    if (advanced && advanced.tagName === "DETAILS") advanced.open = false;
 
     loadEvents();
 })();

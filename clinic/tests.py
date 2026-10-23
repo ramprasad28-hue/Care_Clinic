@@ -809,14 +809,15 @@ class DoctorAdminAddPageTests(TestCase):
                 "speciality": self.speciality.pk,
                 "slot_length_minutes": "30",
                 "is_accepting_appointments": "on",
-                "availabilityrule_set-TOTAL_FORMS": "0",
-                "availabilityrule_set-INITIAL_FORMS": "0",
-                "availabilityrule_set-MIN_NUM_FORMS": "0",
-                "availabilityrule_set-MAX_NUM_FORMS": "1000",
-                "doctorleave_set-TOTAL_FORMS": "0",
-                "doctorleave_set-INITIAL_FORMS": "0",
-                "doctorleave_set-MIN_NUM_FORMS": "0",
-                "doctorleave_set-MAX_NUM_FORMS": "1000",
+                # Inline formset prefixes follow the FK related_name values.
+                "availability_rules-TOTAL_FORMS": "0",
+                "availability_rules-INITIAL_FORMS": "0",
+                "availability_rules-MIN_NUM_FORMS": "0",
+                "availability_rules-MAX_NUM_FORMS": "1000",
+                "leaves-TOTAL_FORMS": "0",
+                "leaves-INITIAL_FORMS": "0",
+                "leaves-MIN_NUM_FORMS": "0",
+                "leaves-MAX_NUM_FORMS": "1000",
             },
             follow=True,
         )
@@ -826,6 +827,53 @@ class DoctorAdminAddPageTests(TestCase):
         self.assertEqual(doctor.user.role, User.Role.DOCTOR)
         self.assertTrue(doctor.user.check_password(FRESH_PASSWORD))
         self.assertEqual(doctor.registration_number, "REG-RAVI-1")
+
+    def test_admin_post_with_inline_rows_saves_doctor_with_schedule(self):
+        """The calendar's draft-sync path: inline rows posted with the create
+        form land in the DB with ownership forced to the new doctor."""
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            self.add_url,
+            {
+                "account_mode": ACCOUNT_MODE_NEW,
+                "new_first_name": "Priya",
+                "new_last_name": "Nair",
+                "new_email": "dr.priya@example.com",
+                "new_phone": "9876500011",
+                "new_password1": FRESH_PASSWORD,
+                "new_password2": FRESH_PASSWORD,
+                "registration_number": "REG-PRIYA-1",
+                "qualification": "MBBS",
+                "speciality": self.speciality.pk,
+                "slot_length_minutes": "30",
+                "is_accepting_appointments": "on",
+                "availability_rules-TOTAL_FORMS": "1",
+                "availability_rules-INITIAL_FORMS": "0",
+                "availability_rules-MIN_NUM_FORMS": "0",
+                "availability_rules-MAX_NUM_FORMS": "1000",
+                "availability_rules-0-weekday": str(Weekday.MONDAY),
+                "availability_rules-0-start_time": "09:00",
+                "availability_rules-0-end_time": "13:00",
+                "availability_rules-0-slot_length_minutes": "",
+                "availability_rules-0-is_active": "on",
+                "leaves-TOTAL_FORMS": "1",
+                "leaves-INITIAL_FORMS": "0",
+                "leaves-MIN_NUM_FORMS": "0",
+                "leaves-MAX_NUM_FORMS": "1000",
+                "leaves-0-start_date": "2026-12-24",
+                "leaves-0-end_date": "2026-12-25",
+                "leaves-0-reason": "Holiday",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        doctor = Doctor.objects.get(user__email="dr.priya@example.com")
+        rule = AvailabilityRule.objects.get(doctor=doctor)
+        self.assertEqual(rule.weekday, Weekday.MONDAY)
+        self.assertEqual(rule.start_time, time(9, 0))
+        self.assertEqual(rule.slot_length_minutes, None)  # doctor default (30)
+        leave = DoctorLeave.objects.get(doctor=doctor)
+        self.assertEqual(leave.reason, "Holiday")
 
     def test_doctors_do_not_see_the_add_doctor_page(self):
         doctor_user = make_user(
@@ -1266,28 +1314,40 @@ class DoctorScheduleEndpointTests(TestCase):
         self.assertIn("doctor_schedule_calendar.js", content)
         self.assertIn("doctor_schedule_calendar.css", content)
 
-    def test_admin_role_change_page_hides_inline_formsets(self):
-        # Django model permissions are only assigned in production seed data, so
-        # role-ADMIN (non-superuser) staff see the calendar widget but not the
-        # inline formsets; the fallback for them is the standalone admin pages.
+    def test_admin_role_change_page_keeps_inline_formsets(self):
+        # Inline formsets follow the administrator-only rule explicitly, so
+        # role-ADMIN (non-superuser) staff get the same workflow as superusers:
+        # calendar widget on the page AND inline formsets for the drafts.
         response = self.client.get(
             reverse("admin:clinic_doctor_change", args=[self.doctor.pk])
         )
-        self.assertNotIn(
-            'name="availabilityrule_set-TOTAL_FORMS"',
-            response.rendered_content,
+        content = response.rendered_content
+        self.assertIn(
+            'name="availability_rules-TOTAL_FORMS"',
+            content,
         )
+        self.assertIn('name="leaves-TOTAL_FORMS"', content)
+        self.assertIn('id="cc-calendar"', content)
 
     def test_superuser_change_and_add_pages_keep_inline_formsets(self):
         superuser = make_admin(email="schedule-super@example.com", is_superuser=True)
         client = self.client_class()
         client.force_login(superuser)
 
+        # Add page: calendar in unsaved-draft mode + inline formsets for the
+        # no-JavaScript fallback (both are required when JS fails).
         add_content = client.get(reverse("admin:clinic_doctor_add")).rendered_content
-        self.assertNotIn('id="cc-calendar"', add_content)
+        self.assertIn('id="cc-calendar"', add_content)
+        self.assertIn('data-unsaved="true"', add_content)
+        self.assertIn(
+            "/admin/clinic/doctor/0/schedule/events/",
+            add_content,
+        )
         self.assertIn('name="availability_rules-TOTAL_FORMS"', add_content)
         self.assertIn('name="leaves-TOTAL_FORMS"', add_content)
 
+        # Change page: concrete endpoints + an "Advanced scheduling forms"
+        # disclosure wrapping the inline formsets.
         change_content = client.get(
             reverse("admin:clinic_doctor_change", args=[self.doctor.pk])
         ).rendered_content
@@ -1295,3 +1355,257 @@ class DoctorScheduleEndpointTests(TestCase):
             'name="availability_rules-TOTAL_FORMS"',
             change_content,
         )
+        self.assertIn('data-cc-advanced', change_content)
+        self.assertIn('data-unsaved="false"', change_content)
+        self.assertNotIn("/admin/clinic/doctor/0/schedule/", change_content)
+
+    def test_role_admin_pages_carry_calendar_draft_configuration(self):
+        # Non-superuser role-ADMIN accounts see the same entries: the add
+        # page in draft mode (JS syncs drafts into the inline formsets) and
+        # the change page with concrete endpoints.
+        client = self.client_class()
+        client.force_login(self.admin)
+
+        add_content = client.get(reverse("admin:clinic_doctor_add")).rendered_content
+        self.assertIn('id="cc-calendar"', add_content)
+        self.assertIn('data-unsaved="true"', add_content)
+        self.assertIn('name="availability_rules-TOTAL_FORMS"', add_content)
+        self.assertIn('name="leaves-TOTAL_FORMS"', add_content)
+
+        change_content = client.get(
+            reverse("admin:clinic_doctor_change", args=[self.doctor.pk])
+        ).rendered_content
+        self.assertIn('data-unsaved="false"', change_content)
+        self.assertIn('data-cc-advanced', change_content)
+
+    # -- regression guards (calendar-status failures, Oct 2026) ------------
+    def test_second_create_adds_distinct_rule(self):
+        """A second calendar create must add a row, never overwrite/duplicate."""
+        response = self.client.post(self.create_url, {
+            "weekday": "2", "start_time": "05:00", "end_time": "05:50",
+            "slot_length_minutes": "", "is_active": "on",
+        })
+        self.assertEqual(response.status_code, 201)
+        second_id = response.json()["rule"]["id"]
+        response = self.client.post(self.create_url, {
+            "weekday": "5", "start_time": "06:00", "end_time": "07:00",
+            "slot_length_minutes": "", "is_active": "on",
+        })
+        self.assertEqual(response.status_code, 201)
+        self.assertNotEqual(response.json()["rule"]["id"], second_id)
+        self.assertEqual(
+            AvailabilityRule.objects.filter(doctor=self.doctor).count(), 3
+        )
+
+    def test_update_edits_existing_row_without_creating_duplicate(self):
+        response = self.client.post(
+            reverse("admin:clinic_doctor_schedule_availability_update",
+                    args=[self.doctor.pk, self.rule.pk]),
+            {
+            "weekday": "5", "start_time": "08:30", "end_time": "15:30",
+            "slot_length_minutes": "20", "is_active": "on",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["rule"]["id"], self.rule.pk)
+        before = self.rule
+        before.refresh_from_db()
+        self.assertEqual(before.start_time, time(8, 30))
+        self.assertEqual(before.weekday, Weekday.SATURDAY)
+        self.assertEqual(
+            AvailabilityRule.objects.filter(doctor=self.doctor).count(), 1
+        )
+
+    def test_events_payload_matches_renderer_contract(self):
+        """The client renderer is driven only by these keys; keep them stable."""
+        response = self.client.get(
+            self.events_url, {"start": "2026-10-19", "end": "2026-10-25"}
+        )
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        for key in ("doctor", "start", "end", "occurrences", "rules", "leaves"):
+            self.assertIn(key, payload)
+        self.assertIn("name", payload["doctor"])
+        self.assertIn(
+            "default_slot_length_minutes", payload["doctor"]
+        )
+        self.assertGreater(len(payload["occurrences"]), 0)
+        occurrence = payload["occurrences"][0]
+        for key in (
+            "rule_id", "date", "weekday", "start", "end",
+            "slot_length_minutes", "effective_slot_length_minutes", "is_active",
+        ):
+            self.assertIn(key, occurrence)
+        rule = payload["rules"][0]
+        self.assertIn("weekday_label", rule)
+
+    def test_change_page_dom_hooks_needed_by_calendar_js(self):
+        """The JS selects these hooks; missing any of them breaks the widget
+        (the calendar grid never renders and the inline formsets stay open)."""
+        response = self.client.get(
+            reverse("admin:clinic_doctor_change", args=[self.doctor.pk])
+        )
+        content = response.rendered_content
+        js_hooks = [
+            'id="cc-calendar"',
+            "data-events-url",
+            "data-availability-create-url",
+            "data-leave-create-url",
+            "data-board",
+            "data-range-label",
+            "data-status",
+            "data-spinner",
+            "data-csrf",
+            'id="cc-menu"',
+            "data-menu-date-label",
+            'id="cc-availability-form"',
+            "data-availability-repeat-label",
+            'id="cc-availability-weekday"',
+            'id="cc-availability-start"',
+            'id="cc-availability-end"',
+            'id="cc-availability-slot"',
+            'id="cc-availability-active"',
+            'id="cc-leave-form"',
+            'id="cc-leave-start"',
+            'id="cc-leave-end"',
+            'id="cc-leave-reason"',
+            'id="cc-details"',
+            'id="cc-details-title"',
+            "data-details-list",
+            "data-details-note",
+            'id="cc-confirm"',
+            "data-confirm-text",
+            "data-menu=\"availability\"",
+            "data-menu=\"leave\"",
+            "data-cmd=\"save\"",
+            "data-details=\"edit\"",
+            "data-details=\"toggle\"",
+            "data-details=\"delete\"",
+            "data-confirm=\"yes\"",
+            "data-confirm=\"no\"",
+        ]
+        for hook in js_hooks:
+            with self.subTest(hook=hook):
+                self.assertIn(hook, content)
+        self.assertIn(
+            "/static/js/admin/doctor_schedule_calendar.js", content
+        )
+        self.assertIn(
+            "/static/css/admin/doctor_schedule_calendar.css", content
+        )
+
+
+class ScheduleHubTests(TestCase):
+    """Availability Rules / Doctor Leave entries land on one calendar hub.
+
+    The hub reuses the DoctorAdmin scheduling endpoints through the "/0/"
+    sentinel URLs; administrators get the calendar, doctors keep their
+    own-scoped table page (the hub selects arbitrary doctors).
+    """
+
+    def setUp(self):
+        self.admin = make_admin()
+        self.doctor = make_doctor(
+            make_speciality("Cardiology"), email="hub-doctor@example.com"
+        )
+        self.availability_hub_url = reverse("admin:clinic_availabilityrule_schedule_hub")
+        self.leave_hub_url = reverse("admin:clinic_doctorleave_schedule_hub")
+        self.availability_changelist_url = reverse("admin:clinic_availabilityrule_changelist")
+        self.leave_changelist_url = reverse("admin:clinic_doctorleave_changelist")
+        self.client.force_login(self.admin)
+
+    @staticmethod
+    def sentinel_urls():
+        return (
+            "/admin/clinic/doctor/0/schedule/events/",
+            "/admin/clinic/doctor/0/schedule/availability/create/",
+            "/admin/clinic/doctor/0/schedule/leave/create/",
+        )
+
+    # -- redirects ---------------------------------------------------------
+    def test_availabilityrule_changelist_redirects_admin_to_hub(self):
+        response = self.client.get(self.availability_changelist_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], self.availability_hub_url)
+
+    def test_doctorleave_changelist_redirects_admin_to_hub(self):
+        response = self.client.get(self.leave_changelist_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], self.leave_hub_url)
+
+    def test_explicit_table_param_keeps_the_classical_changelist(self):
+        # "?o=1" is a valid changelist ordering param; custom keys would be
+        # rejected by the admin's query-string validation (?e=1 redirect).
+        for url in (self.availability_changelist_url, self.leave_changelist_url):
+            response = self.client.get(url + "?o=1")
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn('id="cc-calendar"', response.rendered_content)
+
+    # -- hub rendering ------------------------------------------------------
+    def test_availabilityrule_hub_renders_calendar_and_doctor_selector(self):
+        response = self.client.get(self.availability_hub_url)
+        content = response.rendered_content
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="cc-calendar"', content)
+        self.assertIn('data-mode="availability"', content)
+        self.assertIn('data-unsaved="false"', content)
+        for sentinel in self.sentinel_urls():
+            self.assertIn(sentinel, content)
+        self.assertIn('data-doctor-select', content)
+        self.assertIn('id="cc-doctor-select"', content)
+        self.assertIn("hub-doctor@example.com", content)  # doctor option label
+        self.assertIn("?o=1", content)  # fallback link
+        self.assertIn("doctor_schedule_calendar.js", content)
+        self.assertIn("doctor_schedule_calendar.css", content)
+
+    def test_doctorleave_hub_renders_calendar_with_leave_mode(self):
+        response = self.client.get(self.leave_hub_url)
+        self.assertEqual(response.status_code, 200)
+        content = response.rendered_content
+        self.assertIn('data-mode="leave"', content)
+        self.assertIn('data-doctor-select', content)
+
+    def test_hub_preselects_doctor_from_query_param(self):
+        response = self.client.get(self.availability_hub_url + f"?doctor={self.doctor.pk}")
+        content = response.rendered_content
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f'data-doctor="{self.doctor.pk}"', content)
+        option = ['<option value="%d" selected>' % self.doctor.pk]
+        for marker in option:
+            self.assertIn(marker, content)
+        self.assertIn("data-cc-doctor-picker", content)
+        # A preselected hub shows no placeholder option.
+        self.assertNotIn("Choose a doctor to view their schedule", content)
+
+    def test_hub_without_doctor_shows_placeholder_option(self):
+        for url in (self.availability_hub_url, self.leave_hub_url):
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            content = response.rendered_content
+            self.assertIn("Choose a doctor to view their schedule", content)
+            self.assertIn('<option value="" disabled selected>', content)
+
+    # -- doctor-role access --------------------------------------------------
+    def test_hub_rejects_doctor_role_with_403(self):
+        doctor_user = make_staff_role_user("hub-self@example.com", User.Role.DOCTOR)
+        client = self.client_class()
+        client.force_login(doctor_user)
+        for url in (self.availability_hub_url, self.leave_hub_url):
+            response = client.get(url)
+            self.assertEqual(response.status_code, 403)
+
+    def test_doctor_role_keeps_the_self_scoped_changelist_table(self):
+        doctor_user = make_staff_role_user("hub-self@example.com", User.Role.DOCTOR)
+        self.doctor.user = doctor_user
+        self.doctor.save()
+        AvailabilityRule.objects.create(
+            doctor=self.doctor, weekday=Weekday.MONDAY,
+            start_time=time(9, 0), end_time=time(13, 0),
+        )
+        client = self.client_class()
+        client.force_login(doctor_user)
+        response = client.get(self.availability_changelist_url)
+        self.assertEqual(response.status_code, 200)
+        content = response.rendered_content
+        self.assertIn("hub-self@example.com", content)  # scoped row is listed
+        self.assertNotIn('id="cc-calendar"', content)
+        self.assertNotIn('data-doctor-select', content)

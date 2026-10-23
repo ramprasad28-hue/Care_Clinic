@@ -1,23 +1,31 @@
 {% comment %}
-Google Calendar-style scheduling widget for a saved Doctor.
+Google Calendar-style scheduling widget, shared by three entry points:
 
-Rendered inside the main admin <form> but deliberately WITHOUT name
-attributes: inputs inside this block never take part in the doctor form
-POST. All writes go through the JSON endpoints (with the page's CSRF token)
-handled by DoctorAdmin's schedule views.
+* Doctor change page (saved doctor)  — wrapper passes concrete endpoint URLs.
+* Doctor add page (unsaved doctor)   — sentinel URLs (/0/), unsaved draft mode.
+* Schedule hub pages (admin views)   — sentinel URLs + a doctor selector; the
+  JS resolves "/0/" against the currently selected doctor at request time.
 
-The inline formsets above remain fully functional without JavaScript — this
-widget is a progressive enhancement, and the JS collapses the inline blocks
-only when this widget activates.
+Inside the main admin <form> the widget is deliberately rendered WITHOUT name
+attributes — calendar inputs never participate in the doctor form POST. On the
+add page drafts are synced into the availability/leave inline formsets at
+submit time (data-unsaved="true"). All other writes go through the JSON
+endpoints with the page's CSRF token.
 {% endcomment %}
 {% load i18n %}
 <section id="cc-calendar"
-         class="cc-calendar"
+         class="cc-calendar{% if cc_mode %} cc-calendar--{{ cc_mode }}{% endif %}"
          aria-labelledby="cc-heading"
-         data-events-url="{% url 'admin:clinic_doctor_schedule_events' original.pk %}"
-         data-availability-create-url="{% url 'admin:clinic_doctor_schedule_availability_create' original.pk %}"
-         data-leave-create-url="{% url 'admin:clinic_doctor_schedule_leave_create' original.pk %}">
-    <h2 id="cc-heading">{% translate "Doctor schedule" %} <span class="cc-doctor-name" data-doctor-name>{{ original.user.get_full_name|default:original.user.email }}</span></h2>
+         data-mode="{% firstof cc_mode 'doctor' %}"
+         data-doctor="{% if cc_doctor %}{{ cc_doctor.pk }}{% elif original %}{{ original.pk }}{% endif %}"
+         data-unsaved="{% if cc_unsaved %}true{% else %}false{% endif %}"
+         data-events-url="{% firstof cc_events_url '' %}"
+         data-availability-create-url="{% firstof cc_availability_create_url '' %}"
+         data-leave-create-url="{% firstof cc_leave_create_url '' %}">
+    <h2 id="cc-heading">
+        {% translate "Doctor schedule" %}
+        <span class="cc-doctor-name" data-doctor-name>{% if cc_doctor_name %}{{ cc_doctor_name }}{% elif original %}{{ original.user.get_full_name|default:original.user.email }}{% elif cc_unsaved %}{% translate "New doctor (not saved yet)" %}{% endif %}</span>
+    </h2>
 
     <div class="cc-toolbar">
         <div class="cc-nav" role="group" aria-label="{% translate 'Calendar date navigation' %}">
@@ -54,6 +62,7 @@ only when this widget activates.
         <span class="cc-legend__item"><span class="cc-chip cc-chip--availability" aria-hidden="true"></span>{% translate "Weekly availability" %}</span>
         <span class="cc-legend__item"><span class="cc-chip cc-chip--inactive" aria-hidden="true"></span>{% translate "Inactive (not bookable)" %}</span>
         <span class="cc-legend__item"><span class="cc-chip cc-chip--leave" aria-hidden="true"></span>{% translate "Doctor leave" %}</span>
+        <span class="cc-legend__item"><span class="cc-chip cc-chip--draft" aria-hidden="true"></span>{% translate "Unsaved draft (saved with the doctor form)" %}</span>
         <span class="cc-legend__item">{% translate "Availability repeats every week; leave covers specific dates." %}</span>
     </div>
 
@@ -89,7 +98,7 @@ only when this widget activates.
 
         <label class="cc-label" for="cc-availability-slot">{% translate "Slot duration (minutes)" %}</label>
         <input id="cc-availability-slot" data-input="slot" type="number" class="cc-input" min="1"
-               placeholder="{{ original.slot_length_minutes|default:30 }}" inputmode="numeric"
+               placeholder="{% firstof cc_slot_default '30' %}" inputmode="numeric"
                aria-describedby="cc-availability-slot-help">
         <p class="cc-help" id="cc-availability-slot-help">{% translate "Leave blank to use the doctor's default." %}</p>
 
