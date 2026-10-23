@@ -1,0 +1,149 @@
+{% comment %}
+Google Calendar-style scheduling widget for a saved Doctor.
+
+Rendered inside the main admin <form> but deliberately WITHOUT name
+attributes: inputs inside this block never take part in the doctor form
+POST. All writes go through the JSON endpoints (with the page's CSRF token)
+handled by DoctorAdmin's schedule views.
+
+The inline formsets above remain fully functional without JavaScript — this
+widget is a progressive enhancement, and the JS collapses the inline blocks
+only when this widget activates.
+{% endcomment %}
+{% load i18n %}
+<section id="cc-calendar"
+         class="cc-calendar"
+         aria-labelledby="cc-heading"
+         data-events-url="{% url 'admin:clinic_doctor_schedule_events' original.pk %}"
+         data-availability-create-url="{% url 'admin:clinic_doctor_schedule_availability_create' original.pk %}"
+         data-leave-create-url="{% url 'admin:clinic_doctor_schedule_leave_create' original.pk %}">
+    <h2 id="cc-heading">{% translate "Doctor schedule" %} <span class="cc-doctor-name" data-doctor-name>{{ original.user.get_full_name|default:original.user.email }}</span></h2>
+
+    <div class="cc-toolbar">
+        <div class="cc-nav" role="group" aria-label="{% translate 'Calendar date navigation' %}">
+            <button type="button" class="cc-btn cc-btn--ghost" data-action="prev"
+                    aria-label="{% translate 'Previous period' %}">&#8249;</button>
+            <button type="button" class="cc-btn cc-btn--ghost cc-today" data-action="today">{% translate "Today" %}</button>
+            <button type="button" class="cc-btn cc-btn--ghost" data-action="next"
+                    aria-label="{% translate 'Next period' %}">&#8250;</button>
+        </div>
+        <div class="cc-range-label" data-range-label aria-live="polite"></div>
+        <div class="cc-view-switch" role="group" aria-label="{% translate 'Calendar view' %}">
+            <button type="button" class="cc-btn" data-view="month">{% translate "Month" %}</button>
+            <button type="button" class="cc-btn" data-view="week">{% translate "Week" %}</button>
+            <button type="button" class="cc-btn" data-view="day">{% translate "Day" %}</button>
+        </div>
+        <div class="cc-actions">
+            <button type="button" class="cc-btn cc-btn--primary" data-action="add-availability">
+                + {% translate "Add availability" %}
+            </button>
+            <button type="button" class="cc-btn" data-action="add-leave">
+                + {% translate "Add leave" %}
+            </button>
+        </div>
+        <div class="cc-spinner" data-spinner aria-live="polite" aria-label="{% translate 'Saving' %}" hidden>
+            <span class="cc-spinner__dot"></span><span class="cc-spinner__dot"></span><span class="cc-spinner__dot"></span>
+        </div>
+    </div>
+
+    <p class="cc-status" data-status role="status" aria-live="polite"></p>
+
+    <div class="cc-board" data-board></div>
+
+    <div class="cc-legend">
+        <span class="cc-legend__item"><span class="cc-chip cc-chip--availability" aria-hidden="true"></span>{% translate "Weekly availability" %}</span>
+        <span class="cc-legend__item"><span class="cc-chip cc-chip--inactive" aria-hidden="true"></span>{% translate "Inactive (not bookable)" %}</span>
+        <span class="cc-legend__item"><span class="cc-chip cc-chip--leave" aria-hidden="true"></span>{% translate "Doctor leave" %}</span>
+        <span class="cc-legend__item">{% translate "Availability repeats every week; leave covers specific dates." %}</span>
+    </div>
+
+    <div class="cc-csrf" data-csrf hidden aria-hidden="true">{% csrf_token %}</div>
+</section>
+
+<dialog id="cc-menu" class="cc-dialog" aria-labelledby="cc-menu-title">
+    <h3 id="cc-menu-title">{% translate "Add to schedule" %}</h3>
+    <p class="cc-dialog__hint" data-menu-date-label></p>
+    <div class="cc-dialog__actions">
+        <button type="button" class="cc-btn cc-btn--primary" data-menu="availability">{% translate "Weekly availability" %}</button>
+        <button type="button" class="cc-btn" data-menu="leave">{% translate "Doctor leave" %}</button>
+        <button type="button" class="cc-btn cc-btn--ghost" data-menu="close">{% translate "Cancel" %}</button>
+    </div>
+</dialog>
+
+<dialog id="cc-availability-form" class="cc-dialog" aria-labelledby="cc-availability-form-title">
+    <h3 id="cc-availability-form-title">{% translate "Weekly availability" %}</h3>
+    <p class="cc-dialog__note cc-dialog__note--recurring">
+        {% translate "This rule repeats every week — it is NOT a single-date event." %}
+    </p>
+    <div class="cc-form-grid">
+        <label class="cc-label" for="cc-availability-weekday">{% translate "Day of week" %}</label>
+        <select id="cc-availability-weekday" data-input="weekday"
+                class="cc-select" aria-describedby="cc-availability-weekday-help"></select>
+        <p class="cc-help" id="cc-availability-weekday-help" data-availability-repeat-label></p>
+
+        <label class="cc-label" for="cc-availability-start">{% translate "Start time" %}</label>
+        <input id="cc-availability-start" data-input="start" type="time" class="cc-input" min="00:00" max="23:59" required>
+
+        <label class="cc-label" for="cc-availability-end">{% translate "End time" %}</label>
+        <input id="cc-availability-end" data-input="end" type="time" class="cc-input" min="00:00" max="23:59" required>
+
+        <label class="cc-label" for="cc-availability-slot">{% translate "Slot duration (minutes)" %}</label>
+        <input id="cc-availability-slot" data-input="slot" type="number" class="cc-input" min="1"
+               placeholder="{{ original.slot_length_minutes|default:30 }}" inputmode="numeric"
+               aria-describedby="cc-availability-slot-help">
+        <p class="cc-help" id="cc-availability-slot-help">{% translate "Leave blank to use the doctor's default." %}</p>
+
+        <label class="cc-check" for="cc-availability-active">
+            <input id="cc-availability-active" data-input="active" type="checkbox" checked>
+            {% translate "Active (bookable)" %}
+        </label>
+    </div>
+    <ul class="cc-errors" data-errors hidden></ul>
+    <div class="cc-dialog__actions">
+        <button type="button" class="cc-btn cc-btn--primary" data-cmd="save" data-save-url>Save</button>
+        <button type="button" class="cc-btn cc-btn--ghost" data-cmd="close">{% translate "Cancel" %}</button>
+    </div>
+</dialog>
+
+<dialog id="cc-leave-form" class="cc-dialog" aria-labelledby="cc-leave-form-title">
+    <h3 id="cc-leave-form-title">{% translate "Doctor leave" %}</h3>
+    <p class="cc-dialog__note">{% translate "Leave blocks bookings on these specific dates only." %}</p>
+    <div class="cc-form-grid">
+        <label class="cc-label" for="cc-leave-start">{% translate "Leave start date" %}</label>
+        <input id="cc-leave-start" data-input="start_date" type="date" class="cc-input" required>
+
+        <label class="cc-label" for="cc-leave-end">{% translate "Leave end date" %}</label>
+        <input id="cc-leave-end" data-input="end_date" type="date" class="cc-input" required>
+
+        <label class="cc-label" for="cc-leave-reason">{% translate "Reason" %}</label>
+        <input id="cc-leave-reason" data-input="reason" type="text" class="cc-input" maxlength="255"
+               placeholder="{% translate 'e.g. Conference, annual leave' %}">
+    </div>
+    <ul class="cc-errors" data-errors hidden></ul>
+    <div class="cc-dialog__actions">
+        <button type="button" class="cc-btn cc-btn--primary" data-cmd="save">Save</button>
+        <button type="button" class="cc-btn cc-btn--ghost" data-cmd="close">{% translate "Cancel" %}</button>
+    </div>
+</dialog>
+
+<dialog id="cc-details" class="cc-dialog" aria-labelledby="cc-details-title">
+    <h3 id="cc-details-title"></h3>
+    <dl class="cc-details-list" data-details-list></dl>
+    <p class="cc-dialog__note" data-details-note hidden></p>
+    <div class="cc-dialog__actions">
+        <button type="button" class="cc-btn cc-btn--primary" data-details="edit">{% translate "Edit" %}</button>
+        <button type="button" class="cc-btn" data-details="toggle" data-toggle-action></button>
+        <button type="button" class="cc-btn cc-btn--danger" data-details="delete">{% translate "Delete" %}</button>
+        <button type="button" class="cc-btn cc-btn--ghost" data-details="close">{% translate "Close" %}</button>
+    </div>
+</dialog>
+
+<dialog id="cc-confirm" class="cc-dialog" aria-labelledby="cc-confirm-title">
+    <h3 id="cc-confirm-title">{% translate "Delete schedule entry?" %}</h3>
+    <p class="cc-dialog__hint" data-confirm-text></p>
+    <p class="cc-dialog__note">{% translate "This removes the rule on the server. Existing booked appointments are never deleted." %}</p>
+    <div class="cc-dialog__actions">
+        <button type="button" class="cc-btn cc-btn--danger" data-confirm="yes">{% translate "Delete" %}</button>
+        <button type="button" class="cc-btn cc-btn--ghost" data-confirm="no">{% translate "Keep it" %}</button>
+    </div>
+</dialog>
