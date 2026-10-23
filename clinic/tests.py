@@ -15,6 +15,11 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from clinic.admin import AvailabilityRuleAdmin, DoctorAdmin, SpecialityAdmin
+from clinic.forms import (
+    ACCOUNT_MODE_EXISTING,
+    ACCOUNT_MODE_NEW,
+    DoctorAdminForm,
+)
 from clinic.models import AvailabilityRule, Doctor, DoctorLeave, Speciality, Weekday
 
 User = get_user_model()
@@ -610,3 +615,222 @@ class ClinicTemplatePresentationTests(TestCase):
             reverse("clinic:leave_delete", kwargs={"pk": self.leave.pk})
         )
         self.assertContains(leave_page, 'aria-labelledby="delete-leave-heading"')
+
+
+# --------------------------------------------------------------------------
+# Admin: Add Doctor — dual account mode (existing user / new account)
+# --------------------------------------------------------------------------
+FRESH_PASSWORD = "Fresh-Treat!42"
+
+
+class DoctorAdminAddFormTests(TestCase):
+    """DoctorAdminForm dual account-mode on the admin Add doctor form."""
+
+    def setUp(self):
+        self.speciality = make_speciality("Cardiology")
+        self.existing_doctor_user = make_user(
+            email="eligible@example.com", role=User.Role.DOCTOR
+        )
+        self.patient_user = make_user(
+            email="patient@example.com", role=User.Role.PATIENT
+        )
+        make_doctor(self.speciality, email="takenprofile@example.com")
+
+    def base_data(self, **overrides):
+        data = {
+            "account_mode": ACCOUNT_MODE_NEW,
+            "new_first_name": "Nyasha",
+            "new_last_name": "Moyo",
+            "new_email": "newdoctor@example.com",
+            "new_phone": "9876543210",
+            "new_password1": FRESH_PASSWORD,
+            "new_password2": FRESH_PASSWORD,
+            "registration_number": "REG-NEW-1",
+            "qualification": "MBBS, MD",
+            "slot_length_minutes": 30,
+            "speciality": self.speciality.pk,
+        }
+        data.update(overrides)
+        return data
+
+    def form(self, data, files=None):
+        return DoctorAdminForm(data=data, files=files)
+
+    # -- new account mode ------------------------------------------------
+    def test_new_account_mode_creates_doctor_with_new_doctor_role_account(self):
+        before_doctors = Doctor.objects.count()
+        form = self.form(self.base_data())
+        self.assertTrue(form.is_valid(), form.errors)
+        doctor = form.save()
+
+        self.assertEqual(doctor.user.email, "newdoctor@example.com")
+        self.assertEqual(doctor.user.get_full_name(), "Nyasha Moyo")
+        self.assertEqual(doctor.user.role, User.Role.DOCTOR)
+        self.assertFalse(doctor.user.is_staff)
+        self.assertFalse(doctor.user.is_superuser)
+        self.assertTrue(doctor.user.check_password(FRESH_PASSWORD))
+        self.assertEqual(Doctor.objects.count(), before_doctors + 1)
+        self.assertEqual(doctor.speciality, self.speciality)
+
+    def test_new_account_mode_rejects_duplicate_email(self):
+        form = self.form(self.base_data(new_email="patient@example.com"))
+        self.assertFalse(form.is_valid())
+        self.assertIn("new_email", form.errors)
+        self.assertFalse(Doctor.objects.filter(user__email="patient@example.com").exists())
+
+    def test_new_account_mode_rejects_mismatched_passwords(self):
+        form = self.form(self.base_data(new_password2="Fresh-Treat!43"))
+        self.assertFalse(form.is_valid())
+        self.assertIn("new_password2", form.errors)
+
+    def test_new_account_mode_enforces_password_site_policy(self):
+        form = self.form(self.base_data(new_password1="short", new_password2="short"))
+        self.assertFalse(form.is_valid())
+        self.assertIn("new_password1", form.errors)
+        self.assertFalse(User.objects.filter(email="newdoctor@example.com").exists())
+
+    def test_new_account_mode_requires_name_email_and_passwords(self):
+        form = self.form(
+            {
+                "account_mode": ACCOUNT_MODE_NEW,
+                "registration_number": "REG-NEW-2",
+                "qualification": "MBBS",
+                "speciality": self.speciality.pk,
+            }
+        )
+        self.assertFalse(form.is_valid())
+        for field in ("new_first_name", "new_email", "new_password1", "new_password2"):
+            self.assertIn(field, form.errors, field)
+        self.assertEqual(User.objects.count(), 3)
+
+    def test_failed_doctor_validation_leaves_no_orphaned_user_account(self):
+        # Valid account data but a profile-level unique conflict (duplicate
+        # registration number): nothing must persist on either side.
+        before_users = User.objects.count()
+        form = self.form(
+            self.base_data(registration_number="REG-takenprofile@example.com")
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("registration_number", form.errors)
+        self.assertEqual(User.objects.count(), before_users)
+        self.assertEqual(Doctor.objects.count(), 1)
+
+    def test_new_account_mode_ignores_tampered_user_choice(self):
+        # A manually forged POST must not be able to attach an arbitrary
+        # user in "new account" mode; the account fields decide the outcome.
+        form = self.form(self.base_data(user=self.existing_doctor_user.pk))
+        self.assertTrue(form.is_valid(), form.errors)
+        doctor = form.save()
+        self.assertEqual(doctor.user.email, "newdoctor@example.com")
+        self.assertEqual(doctor.user.role, User.Role.DOCTOR)
+        self.assertFalse(Doctor.objects.filter(user=self.existing_doctor_user).exists())
+        self.assertEqual(User.objects.count(), 4)
+
+    # -- existing account mode -------------------------------------------
+    def test_existing_mode_still_supported(self):
+        form = self.form(
+            self.base_data(
+                account_mode=ACCOUNT_MODE_EXISTING,
+                user=self.existing_doctor_user.pk,
+                registration_number="REG-EXIST-1",
+            )
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        doctor = form.save()
+        self.assertEqual(doctor.user, self.existing_doctor_user)
+        self.assertEqual(User.objects.count(), 3)
+
+    def test_existing_mode_rejects_non_doctor_user(self):
+        form = self.form(
+            self.base_data(
+                account_mode=ACCOUNT_MODE_EXISTING,
+                user=self.patient_user.pk,
+                registration_number="REG-EXIST-2",
+            )
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("user", form.errors)
+
+    def test_existing_mode_rejects_user_with_existing_profile(self):
+        profiled = User.objects.get(email="takenprofile@example.com")
+        form = self.form(
+            self.base_data(
+                account_mode=ACCOUNT_MODE_EXISTING,
+                user=profiled.pk,
+                registration_number="REG-EXIST-3",
+            )
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("user", form.errors)
+        self.assertEqual(Doctor.objects.count(), 1)
+
+    def test_tampered_account_mode_value_rejected(self):
+        form = self.form(self.base_data(account_mode="hijack"))
+        self.assertFalse(form.is_valid())
+        self.assertIn("account_mode", form.errors)
+
+
+class DoctorAdminAddPageTests(TestCase):
+    """Client-level admin view tests for the dual account-mode add page."""
+
+    def setUp(self):
+        self.speciality = make_speciality("Cardiology")
+        self.add_url = reverse("admin:clinic_doctor_add")
+        self.admin = make_user(email="clinic-admin@example.com", role=User.Role.ADMIN)
+        self.admin.is_staff = True
+        self.admin.save()
+
+    def test_add_page_renders_account_mode_fields(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(self.add_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="account_mode"')
+        self.assertContains(response, 'value="new"')
+        self.assertContains(response, 'name="new_email"')
+        self.assertContains(response, 'name="new_password1"')
+        self.assertContains(response, 'name="new_password2"')
+        self.assertContains(response, 'name="new_phone"')
+        self.assertIn("js/admin/doctor_account_mode.js", response.rendered_content)
+
+    def test_admin_post_creates_user_and_doctor_together(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            self.add_url,
+            {
+                "account_mode": ACCOUNT_MODE_NEW,
+                "new_first_name": "Ravi",
+                "new_last_name": "Kumar",
+                "new_email": "dr.ravi@example.com",
+                "new_phone": "9876500000",
+                "new_password1": FRESH_PASSWORD,
+                "new_password2": FRESH_PASSWORD,
+                "registration_number": "REG-RAVI-1",
+                "qualification": "MBBS, MS",
+                "speciality": self.speciality.pk,
+                "slot_length_minutes": "30",
+                "is_accepting_appointments": "on",
+                "availabilityrule_set-TOTAL_FORMS": "0",
+                "availabilityrule_set-INITIAL_FORMS": "0",
+                "availabilityrule_set-MIN_NUM_FORMS": "0",
+                "availabilityrule_set-MAX_NUM_FORMS": "1000",
+                "doctorleave_set-TOTAL_FORMS": "0",
+                "doctorleave_set-INITIAL_FORMS": "0",
+                "doctorleave_set-MIN_NUM_FORMS": "0",
+                "doctorleave_set-MAX_NUM_FORMS": "1000",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        doctor = Doctor.objects.get(user__email="dr.ravi@example.com")
+        self.assertEqual(doctor.user.role, User.Role.DOCTOR)
+        self.assertTrue(doctor.user.check_password(FRESH_PASSWORD))
+        self.assertEqual(doctor.registration_number, "REG-RAVI-1")
+
+    def test_doctors_do_not_see_the_add_doctor_page(self):
+        doctor_user = make_user(
+            email="staff-doctor@example.com", role=User.Role.DOCTOR, is_staff=True
+        )
+        self.client.force_login(doctor_user)
+        response = self.client.get(self.add_url)
+        self.assertEqual(response.status_code, 403)

@@ -206,6 +206,29 @@ class DoctorAdmin(ImageWarningAdminMixin, AdministratorOnlyMixin, admin.ModelAdm
     readonly_fields = ("portrait_preview", "created_at", "updated_at", "slug")
     inlines = [AvailabilityRuleInline, DoctorLeaveInline]
 
+    def get_fields(self, request, obj=None):
+        """Add the dual account-mode fields to the admin's computed fieldsets.
+
+        ``ModelAdmin.get_fields`` derives the rendered fields from
+        ``form.base_fields`` (class-level), while DoctorAdminForm adds its
+        account-mode fields per-instance (add requests only, renamed on
+        change). Extend the computed field list here so the selector and the
+        provisioned-account inputs render on the Add page, in a predictable
+        order, and stay absent when editing an existing Doctor.
+        """
+        fields = list(super().get_fields(request, obj))
+        add_only = list(DoctorAdminForm.add_only_field_names)
+        if obj is not None:
+            # Change mode: DoctorAdminForm drops these per-instance; strip
+            # them from the computed field list to match.
+            return [f for f in fields if f not in add_only]
+        fields = [f for f in fields if f not in add_only]
+        # Toolbar order for a natural flow: mode selector, existing-user
+        # picker, provisioned-account fields, then the doctor profile fields.
+        if "user" in fields:
+            fields.remove("user")
+        return ["account_mode", "user", *DoctorAdminForm.new_account_field_names, *fields]
+
     def portrait_thumb(self, obj):
         src = _media_src(obj.profile_image)
         if not src:
