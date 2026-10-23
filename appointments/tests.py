@@ -95,6 +95,12 @@ def near_future_slot(doctor, hours=2):
     """A slot that starts in ``hours`` (still fully bookable) — used for the
     cancellation-window tests where "7 days out" would always be cancellable."""
     start = timezone.localtime(timezone.now() + timedelta(hours=hours))
+    start = start.replace(second=0, microsecond=0)
+    # A slot must stay inside one calendar day (end > start, date-blind
+    # check); running the suite just before ~22:00 local would otherwise
+    # roll the 15-minute end across midnight. Shift back into the day.
+    if (start.hour, start.minute) >= (23, 45):
+        start = start.replace(hour=23, minute=39)
     end = start + timedelta(minutes=15)
     return make_slot(doctor, start.date(), start.time(), end.time())
 
