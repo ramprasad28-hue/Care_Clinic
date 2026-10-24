@@ -330,6 +330,169 @@ class AvailabilityRule(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
+class OneDayAvailability(models.Model):
+    """
+    Availability for a specific calendar date.
+
+    Unlike AvailabilityRule, this record never repeats weekly.
+    """
+
+    doctor = models.ForeignKey(
+        Doctor,
+        on_delete=models.CASCADE,
+        related_name="one_day_availabilities",
+        verbose_name=_("doctor"),
+    )
+
+    date = models.DateField(_("date"))
+
+    start_time = models.TimeField(_("start time"))
+
+    end_time = models.TimeField(_("end time"))
+
+    slot_length_minutes = models.PositiveSmallIntegerField(
+        _("slot length (minutes)"),
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        help_text=_(
+            "Leave blank to use the doctor's default slot length."
+        ),
+    )
+
+    is_active = models.BooleanField(
+        _("active"),
+        default=True,
+    )
+
+    created_at = models.DateTimeField(
+        _("created at"),
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        _("updated at"),
+        auto_now=True,
+    )
+
+    class Meta:
+        verbose_name = _("one-day availability")
+        verbose_name_plural = _("one-day availability")
+        ordering = ["date", "start_time"]
+
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(
+                    end_time__gt=models.F("start_time")
+                ),
+                name="clinic_one_day_end_after_start",
+            ),
+        ]
+
+        indexes = [
+            models.Index(
+                fields=["doctor", "date", "is_active"],
+                name="clinic_one_day_doc_date_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.doctor} — {self.date} "
+            f"{self.start_time:%H:%M}-{self.end_time:%H:%M}"
+        )
+
+    @property
+    def effective_slot_length_minutes(self):
+        """
+        Use the date-specific slot duration when supplied;
+        otherwise use the doctor's default duration.
+        """
+        return (
+            self.slot_length_minutes
+            or self.doctor.slot_length_minutes
+        )
+
+    def clean(self):
+        super().clean()
+
+        errors = {}
+
+        if (
+            self.start_time
+            and self.end_time
+            and self.end_time <= self.start_time
+        ):
+            errors["end_time"] = _(
+                "End time must be later than start time."
+            )
+
+        if (
+            self.slot_length_minutes is not None
+            and self.slot_length_minutes <= 0
+        ):
+            errors["slot_length_minutes"] = _(
+                "Slot duration must be positive."
+            )
+
+        if (
+            self.doctor_id
+            and self.date
+            and self.start_time
+            and self.end_time
+            and not errors
+        ):
+            # A doctor's leave takes precedence over availability.
+            on_leave = DoctorLeave.objects.filter(
+                doctor_id=self.doctor_id,
+                start_date__lte=self.date,
+                end_date__gte=self.date,
+            ).exists()
+
+            if on_leave:
+                errors["date"] = _(
+                    "This doctor is on leave on the selected date."
+                )
+
+            # Avoid overlapping active weekly availability windows.
+            weekday = self.date.weekday()
+
+            weekly_overlap = AvailabilityRule.objects.filter(
+                doctor_id=self.doctor_id,
+                weekday=weekday,
+                is_active=True,
+                start_time__lt=self.end_time,
+                end_time__gt=self.start_time,
+            ).exists()
+
+            if weekly_overlap:
+                errors["start_time"] = _(
+                    "This time overlaps an active weekly availability rule."
+                )
+
+            # Avoid overlapping one-day availability windows.
+            one_day_rules = OneDayAvailability.objects.filter(
+                doctor_id=self.doctor_id,
+                date=self.date,
+                is_active=True,
+                start_time__lt=self.end_time,
+                end_time__gt=self.start_time,
+            )
+
+            if self.pk:
+                one_day_rules = one_day_rules.exclude(pk=self.pk)
+
+            if one_day_rules.exists():
+                errors["start_time"] = _(
+                    "This time overlaps another active one-day availability rule."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 class DoctorLeave(models.Model):
     """An inclusive date range during which a doctor is unavailable."""

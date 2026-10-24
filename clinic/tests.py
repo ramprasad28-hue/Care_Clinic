@@ -367,6 +367,212 @@ class LeaveAccessTests(TestCase):
 
 
 # --------------------------------------------------------------------------
+# OneDayAvailability
+# --------------------------------------------------------------------------
+class OneDayAvailabilityModelTests(TestCase):
+    def setUp(self):
+        self.doctor = make_doctor()
+
+    def test_create_valid_one_day_availability(self):
+        from clinic.models import OneDayAvailability
+        
+        one_day = OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=date(2026, 10, 25),
+            start_time=time(10, 0),
+            end_time=time(14, 0),
+        )
+        self.assertTrue(one_day.is_active)
+        self.assertEqual(one_day.effective_slot_length_minutes, 30)  # doctor default
+
+    def test_end_time_must_be_after_start(self):
+        from clinic.models import OneDayAvailability
+        
+        with self.assertRaises(ValidationError):
+            OneDayAvailability.objects.create(
+                doctor=self.doctor,
+                date=date(2026, 10, 25),
+                start_time=time(14, 0),
+                end_time=time(10, 0),
+            )
+
+    def test_slot_duration_must_be_positive(self):
+        from clinic.models import OneDayAvailability
+        
+        with self.assertRaises(ValidationError):
+            OneDayAvailability.objects.create(
+                doctor=self.doctor,
+                date=date(2026, 10, 25),
+                start_time=time(10, 0),
+                end_time=time(14, 0),
+                slot_length_minutes=0,
+            )
+
+    def test_rule_slot_length_overrides_doctor(self):
+        from clinic.models import OneDayAvailability
+        
+        one_day = OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=date(2026, 10, 25),
+            start_time=time(10, 0),
+            end_time=time(14, 0),
+            slot_length_minutes=20,
+        )
+        self.assertEqual(one_day.effective_slot_length_minutes, 20)
+
+    def test_leave_date_rejected(self):
+        from clinic.models import OneDayAvailability
+        
+        # Create leave for the target date
+        DoctorLeave.objects.create(
+            doctor=self.doctor,
+            start_date=date(2026, 10, 25),
+            end_date=date(2026, 10, 25),
+            reason="Conference",
+        )
+        
+        # Attempting to add one-day availability on leave date should fail
+        with self.assertRaises(ValidationError) as cm:
+            OneDayAvailability.objects.create(
+                doctor=self.doctor,
+                date=date(2026, 10, 25),
+                start_time=time(10, 0),
+                end_time=time(14, 0),
+            )
+        self.assertIn("on leave", str(cm.exception))
+
+    def test_overlapping_weekly_rule_rejected(self):
+        from clinic.models import OneDayAvailability
+        
+        # Create a weekly Monday rule
+        target_date = date(2026, 10, 26)  # Monday
+        AvailabilityRule.objects.create(
+            doctor=self.doctor,
+            weekday=target_date.weekday(),
+            start_time=time(9, 0),
+            end_time=time(13, 0),
+            is_active=True,
+        )
+        
+        # Overlapping one-day availability should be rejected
+        with self.assertRaises(ValidationError) as cm:
+            OneDayAvailability.objects.create(
+                doctor=self.doctor,
+                date=target_date,
+                start_time=time(12, 0),
+                end_time=time(14, 0),
+            )
+        self.assertIn("overlaps", str(cm.exception))
+
+    def test_non_overlapping_weekly_rule_allowed(self):
+        from clinic.models import OneDayAvailability
+        
+        # Create a weekly Monday rule
+        target_date = date(2026, 10, 26)  # Monday
+        AvailabilityRule.objects.create(
+            doctor=self.doctor,
+            weekday=target_date.weekday(),
+            start_time=time(9, 0),
+            end_time=time(13, 0),
+            is_active=True,
+        )
+        
+        # Adjacent one-day availability should be allowed
+        one_day = OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=target_date,
+            start_time=time(13, 0),
+            end_time=time(17, 0),
+        )
+        self.assertIsNotNone(one_day.pk)
+
+    def test_overlapping_one_day_rules_rejected(self):
+        from clinic.models import OneDayAvailability
+        
+        target_date = date(2026, 10, 25)
+        OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=target_date,
+            start_time=time(9, 0),
+            end_time=time(13, 0),
+            is_active=True,
+        )
+        
+        # Overlapping one-day availability should be rejected
+        with self.assertRaises(ValidationError) as cm:
+            OneDayAvailability.objects.create(
+                doctor=self.doctor,
+                date=target_date,
+                start_time=time(12, 0),
+                end_time=time(14, 0),
+            )
+        self.assertIn("overlaps", str(cm.exception))
+
+    def test_inactive_weekly_rule_does_not_conflict(self):
+        from clinic.models import OneDayAvailability
+        
+        # Create an inactive weekly rule
+        target_date = date(2026, 10, 26)  # Monday
+        AvailabilityRule.objects.create(
+            doctor=self.doctor,
+            weekday=target_date.weekday(),
+            start_time=time(9, 0),
+            end_time=time(13, 0),
+            is_active=False,
+        )
+        
+        # Overlapping one-day availability should be allowed since weekly is inactive
+        one_day = OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=target_date,
+            start_time=time(10, 0),
+            end_time=time(14, 0),
+        )
+        self.assertIsNotNone(one_day.pk)
+
+    def test_different_dates_allowed(self):
+        from clinic.models import OneDayAvailability
+        
+        OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=date(2026, 10, 25),
+            start_time=time(9, 0),
+            end_time=time(13, 0),
+        )
+        
+        # Different date with same time should be allowed
+        one_day = OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=date(2026, 10, 26),
+            start_time=time(9, 0),
+            end_time=time(13, 0),
+        )
+        self.assertIsNotNone(one_day.pk)
+
+    def test_different_doctors_allowed(self):
+        from clinic.models import OneDayAvailability
+        
+        other_speciality = make_speciality("Neurology")
+        other_doctor = make_doctor(email="other@example.com", speciality=other_speciality)
+        
+        OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=date(2026, 10, 25),
+            start_time=time(9, 0),
+            end_time=time(13, 0),
+        )
+        
+        # Same date/time for different doctor should be allowed
+        one_day = OneDayAvailability.objects.create(
+            doctor=other_doctor,
+            date=date(2026, 10, 25),
+            start_time=time(9, 0),
+            end_time=time(13, 0),
+        )
+        self.assertIsNotNone(one_day.pk)
+
+
+# --------------------------------------------------------------------------
 # Admin authorization
 # --------------------------------------------------------------------------
 class AdminAuthorizationTests(TestCase):

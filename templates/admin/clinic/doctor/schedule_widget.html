@@ -21,6 +21,7 @@ endpoints with the page's CSRF token.
          data-unsaved="{% if cc_unsaved %}true{% else %}false{% endif %}"
          data-events-url="{% firstof cc_events_url '' %}"
          data-availability-create-url="{% firstof cc_availability_create_url '' %}"
+         data-one-day-create-url="{% firstof cc_one_day_create_url '' %}"
          data-leave-create-url="{% firstof cc_leave_create_url '' %}">
     <h2 id="cc-heading">
         {% translate "Doctor schedule" %}
@@ -60,10 +61,11 @@ endpoints with the page's CSRF token.
 
     <div class="cc-legend">
         <span class="cc-legend__item"><span class="cc-chip cc-chip--availability" aria-hidden="true"></span>{% translate "Weekly availability" %}</span>
+        <span class="cc-legend__item"><span class="cc-chip cc-chip--one-day" aria-hidden="true"></span>{% translate "One-day availability" %}</span>
         <span class="cc-legend__item"><span class="cc-chip cc-chip--inactive" aria-hidden="true"></span>{% translate "Inactive (not bookable)" %}</span>
         <span class="cc-legend__item"><span class="cc-chip cc-chip--leave" aria-hidden="true"></span>{% translate "Doctor leave" %}</span>
         <span class="cc-legend__item"><span class="cc-chip cc-chip--draft" aria-hidden="true"></span>{% translate "Unsaved draft (saved with the doctor form)" %}</span>
-        <span class="cc-legend__item">{% translate "Availability repeats every week; leave covers specific dates." %}</span>
+        <span class="cc-legend__item">{% translate "Weekly availability repeats every week; one-day and leave cover specific dates." %}</span>
     </div>
 
     <div class="cc-csrf" data-csrf hidden aria-hidden="true">{% csrf_token %}</div>
@@ -74,18 +76,25 @@ endpoints with the page's CSRF token.
     <p class="cc-dialog__hint" data-menu-date-label></p>
     <div class="cc-dialog__actions">
         <button type="button" class="cc-btn cc-btn--primary" data-menu="availability">{% translate "Weekly availability" %}</button>
+        <button type="button" class="cc-btn cc-btn--primary" data-menu="oneDay">{% translate "One-day availability" %}</button>
         <button type="button" class="cc-btn" data-menu="leave">{% translate "Doctor leave" %}</button>
         <button type="button" class="cc-btn cc-btn--ghost" data-menu="close">{% translate "Cancel" %}</button>
     </div>
 </dialog>
 
 <dialog id="cc-availability-form" class="cc-dialog" aria-labelledby="cc-availability-form-title">
-    <h3 id="cc-availability-form-title">{% translate "Weekly availability" %}</h3>
-    <p class="cc-dialog__note cc-dialog__note--recurring">
+    <h3 id="cc-availability-form-title">{% translate "Availability" %}</h3>
+    <p class="cc-dialog__note cc-dialog__note--recurring" data-availability-note-weekly>
         {% translate "This rule repeats every week — it is NOT a single-date event." %}
     </p>
+    <p class="cc-dialog__note" data-availability-note-oneday hidden>
+        {% translate "This availability applies to one specific date only." %}
+    </p>
     <div class="cc-form-grid">
-        <label class="cc-label" for="cc-availability-weekday">{% translate "Day of week" %}</label>
+        <label class="cc-label" for="cc-availability-date" data-label-date hidden>{% translate "Date" %}</label>
+        <input id="cc-availability-date" data-input="date" type="date" class="cc-input" hidden>
+
+        <label class="cc-label" for="cc-availability-weekday" data-label-weekday>{% translate "Day of week" %}</label>
         <select id="cc-availability-weekday" data-input="weekday"
                 class="cc-select" aria-describedby="cc-availability-weekday-help"></select>
         <p class="cc-help" id="cc-availability-weekday-help" data-availability-repeat-label></p>

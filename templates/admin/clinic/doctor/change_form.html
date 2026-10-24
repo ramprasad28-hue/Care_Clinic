@@ -11,11 +11,13 @@
     {% if original and original.pk %}
         {% url 'admin:clinic_doctor_schedule_events' original.pk as cc_events_url %}
         {% url 'admin:clinic_doctor_schedule_availability_create' original.pk as cc_availability_create_url %}
+        {% url 'admin:clinic_doctor_schedule_one_day_create' original.pk as cc_one_day_create_url %}
         {% url 'admin:clinic_doctor_schedule_leave_create' original.pk as cc_leave_create_url %}
         {% include "admin/clinic/doctor/schedule_widget.html" %}
     {% else %}
         {% url 'admin:clinic_doctor_schedule_events' 0 as cc_events_url %}
         {% url 'admin:clinic_doctor_schedule_availability_create' 0 as cc_availability_create_url %}
+        {% url 'admin:clinic_doctor_schedule_one_day_create' 0 as cc_one_day_create_url %}
         {% url 'admin:clinic_doctor_schedule_leave_create' 0 as cc_leave_create_url %}
         {% with cc_unsaved=True %}
             {% include "admin/clinic/doctor/schedule_widget.html" %}

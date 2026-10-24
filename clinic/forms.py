@@ -37,8 +37,13 @@ from website.image_validation import (
     validate_upload_image,
 )
 
-from .models import AvailabilityRule, Doctor, DoctorLeave, Speciality
-
+from .models import (
+    AvailabilityRule,
+    Doctor,
+    DoctorLeave,
+    OneDayAvailability,
+    Speciality,
+)
 User = get_user_model()
 
 ACCOUNT_MODE_EXISTING = "existing"
@@ -59,6 +64,39 @@ class AvailabilityRuleForm(forms.ModelForm):
         self.fields["start_time"].input_formats = ["%H:%M", "%H:%M:%S"]
         self.fields["end_time"].input_formats = ["%H:%M", "%H:%M:%S"]
 
+class OneDayAvailabilityForm(forms.ModelForm):
+    """Form for availability that applies to one specific date."""
+
+    class Meta:
+        model = OneDayAvailability
+        fields = (
+            "date",
+            "start_time",
+            "end_time",
+            "slot_length_minutes",
+            "is_active",
+        )
+        widgets = {
+            "date": forms.DateInput(
+                attrs={"type": "date"},
+                format="%Y-%m-%d",
+            ),
+            "start_time": forms.TimeInput(
+                attrs={"type": "time"},
+                format="%H:%M",
+            ),
+            "end_time": forms.TimeInput(
+                attrs={"type": "time"},
+                format="%H:%M",
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["date"].input_formats = ["%Y-%m-%d"]
+        self.fields["start_time"].input_formats = ["%H:%M", "%H:%M:%S"]
+        self.fields["end_time"].input_formats = ["%H:%M", "%H:%M:%S"]
 
 class DoctorLeaveForm(forms.ModelForm):
     class Meta:

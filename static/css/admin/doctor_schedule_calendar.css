@@ -295,6 +295,12 @@
     color: var(--cc-primary-dark);
 }
 
+.cc-chip--one-day,
+.cc-event--one-day {
+    background: #E0E7FF;
+    color: #4338CA;
+}
+
 .cc-chip--leave,
 .cc-event--leave {
     background: var(--cc-warning-soft);

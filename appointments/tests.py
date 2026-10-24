@@ -215,6 +215,121 @@ class SlotGenerationTests(TestCase):
         )
         self.assertEqual(set(summary.keys()), {self.doctor.pk, other.pk})
 
+    def test_one_day_availability_generates_slots(self):
+        from clinic.models import OneDayAvailability
+        
+        day = future_day(10)  # Sunday
+        OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=day,
+            start_time=time(10, 0),
+            end_time=time(12, 0),
+            is_active=True,
+        )
+        summary = generate_slots_for_doctor(self.doctor, day, day)
+        self.assertEqual(summary["created"], 4)  # 4 x 30-minute slots
+        slots = list(
+            AppointmentSlot.objects.filter(doctor=self.doctor).order_by("start_time")
+        )
+        self.assertEqual(slots[0].start_time, time(10, 0))
+        self.assertEqual(slots[-1].end_time, time(12, 0))
+
+    def test_one_day_with_custom_slot_length(self):
+        from clinic.models import OneDayAvailability
+        
+        day = future_day(10)
+        OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=day,
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+            slot_length_minutes=20,
+            is_active=True,
+        )
+        summary = generate_slots_for_doctor(self.doctor, day, day)
+        self.assertEqual(summary["created"], 3)  # 3 x 20-minute slots
+
+    def test_one_day_on_leave_date_generates_nothing(self):
+        from clinic.models import OneDayAvailability
+        
+        day = future_day(10)
+        OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=day,
+            start_time=time(10, 0),
+            end_time=time(12, 0),
+            is_active=True,
+        )
+        DoctorLeave.objects.create(
+            doctor=self.doctor,
+            start_date=day,
+            end_date=day,
+            reason="Leave",
+        )
+        summary = generate_slots_for_doctor(self.doctor, day, day)
+        self.assertEqual(summary["created"], 0)
+
+    def test_inactive_one_day_availability_ignored(self):
+        from clinic.models import OneDayAvailability
+        
+        day = future_day(10)
+        OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=day,
+            start_time=time(10, 0),
+            end_time=time(12, 0),
+            is_active=False,
+        )
+        summary = generate_slots_for_doctor(self.doctor, day, day)
+        self.assertEqual(summary["created"], 0)
+
+    def test_weekly_and_one_day_combined(self):
+        from clinic.models import OneDayAvailability
+        
+        day = future_day(10)  # Some future date
+        # Weekly rule for that weekday
+        make_rule(self.doctor, day.weekday(), time(9, 0), time(10, 0))
+        # One-day availability for same date (non-overlapping)
+        OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=day,
+            start_time=time(14, 0),
+            end_time=time(15, 0),
+            is_active=True,
+        )
+        summary = generate_slots_for_doctor(self.doctor, day, day)
+        # Should have slots from both: weekly (2) + one-day (2)
+        self.assertEqual(summary["created"], 4)
+        slots = list(
+            AppointmentSlot.objects.filter(doctor=self.doctor).order_by("start_time")
+        )
+        # Verify we have slots from both time ranges
+        start_times = [s.start_time for s in slots]
+        self.assertIn(time(9, 0), start_times)  # from weekly
+        self.assertIn(time(14, 0), start_times)  # from one-day
+
+    def test_one_day_different_dates_independent(self):
+        from clinic.models import OneDayAvailability
+        
+        day1 = future_day(10)
+        day2 = future_day(11)
+        OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=day1,
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+            is_active=True,
+        )
+        OneDayAvailability.objects.create(
+            doctor=self.doctor,
+            date=day2,
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+            is_active=True,
+        )
+        summary = generate_slots_for_doctor(self.doctor, day1, day2)
+        self.assertEqual(summary["created"], 4)  # 2 slots per day
+
 
 # --------------------------------------------------------------------------
 # Slot model & selectors

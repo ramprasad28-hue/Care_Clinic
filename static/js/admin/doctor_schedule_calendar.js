@@ -73,6 +73,7 @@
     var createUrls = {
         availability: root.getAttribute("data-availability-create-url"),
         leave: root.getAttribute("data-leave-create-url"),
+        oneDay: root.getAttribute("data-one-day-create-url"),
     };
 
     var state = {
@@ -80,8 +81,10 @@
         anchor: startOfToday(),
         rules: [],
         leaves: [],
+        oneDayAvailabilities: [], // date-specific availability records
         occurrences: {}, // isoDate -> expanded availability occurrences
-        editing: { availability: null, leave: null },
+        oneDayOccurrences: {}, // isoDate -> one-day availability entries
+        editing: { availability: null, leave: null, oneDay: null },
         selected: null,  // { kind, id }
         context: null,   // { date, start, end } from a cell click
         busy: false,
@@ -90,6 +93,8 @@
         doctorId: null,  // target doctor; null = none selected (hub) / not saved
         draftRules: [],  // unsaved-mode rule entries (negative ids)
         draftLeaves: [], // unsaved-mode leave entries (negative ids)
+        draftOneDayRules: [], // unsaved-mode one-day entries (negative ids)
+        scheduleType: "weekly", // "weekly" or "oneDay"
     };
     var doctorAttr = root.getAttribute("data-doctor");
     if (doctorAttr && /^\d+$/.test(doctorAttr)) state.doctorId = Number(doctorAttr);
@@ -287,16 +292,46 @@
         };
     }
 
+    function draftOneDayEntry(date, start, end, slot, isActive, id) {
+        return {
+            id: id === undefined ? null : id,
+            date: date,
+            start: start,
+            end: end,
+            slot_length_minutes: slot,
+            is_active: !!isActive,
+        };
+    }
+
     function findDraft(kind, id) {
-        var list = kind === "availability" ? state.draftRules : state.draftLeaves;
+        var list;
+        if (kind === "availability") list = state.draftRules;
+        else if (kind === "leave") list = state.draftLeaves;
+        else if (kind === "one_day") list = state.draftOneDayRules;
+        else return null;
         return list.find(function (entry) { return String(entry.id) === String(id); });
     }
 
     function removeDraft(kind, id) {
-        var list = kind === "availability" ? state.draftRules : state.draftLeaves;
-        state[kind === "availability" ? "draftRules" : "draftLeaves"] = list.filter(function (entry) {
-            return String(entry.id) !== String(id);
-        });
+        var list;
+        if (kind === "availability") list = state.draftRules;
+        else if (kind === "leave") list = state.draftLeaves;
+        else if (kind === "one_day") list = state.draftOneDayRules;
+        else return;
+        
+        if (kind === "availability") {
+            state.draftRules = list.filter(function (entry) {
+                return String(entry.id) !== String(id);
+            });
+        } else if (kind === "leave") {
+            state.draftLeaves = list.filter(function (entry) {
+                return String(entry.id) !== String(id);
+            });
+        } else if (kind === "one_day") {
+            state.draftOneDayRules = list.filter(function (entry) {
+                return String(entry.id) !== String(id);
+            });
+        }
     }
 
     function draftIdCounter() {
@@ -307,10 +342,15 @@
     function loadDrafts(range) {
         state.rules = state.draftRules;
         state.leaves = state.draftLeaves;
+        state.oneDayAvailabilities = state.draftOneDayRules;
         state.occurrences = {};
+        state.oneDayOccurrences = {};
+        
         var day = new Date(range.start);
         while (day.getTime() <= range.end.getTime()) {
             var key = isoDate(day);
+            
+            // Expand weekly rules
             state.draftRules.forEach(function (rule) {
                 if (Number(rule.weekday) !== weekdayIndex(day)) return;
                 state.occurrences[key] = state.occurrences[key] || [];
@@ -322,6 +362,20 @@
                     is_active: rule.is_active,
                 });
             });
+            
+            // Add one-day availability for matching dates
+            state.draftOneDayRules.forEach(function (oneDay) {
+                if (oneDay.date !== key) return;
+                state.oneDayOccurrences[key] = state.oneDayOccurrences[key] || [];
+                state.oneDayOccurrences[key].push({
+                    id: oneDay.id,
+                    date: key,
+                    start: oneDay.start,
+                    end: oneDay.end,
+                    is_active: oneDay.is_active,
+                });
+            });
+            
             day = addDays(day, 1);
         }
         render();
@@ -351,7 +405,9 @@
         if (!eventsUrl || state.doctorId === null) {
             state.rules = [];
             state.leaves = [];
+            state.oneDayAvailabilities = [];
             state.occurrences = {};
+            state.oneDayOccurrences = {};
             render();
             return;
         }
@@ -362,14 +418,26 @@
                 status("Could not load the schedule. " + errorText(result.payload), "error");
                 state.rules = [];
                 state.leaves = [];
+                state.oneDayAvailabilities = [];
                 state.occurrences = {};
+                state.oneDayOccurrences = {};
             } else {
                 state.rules = result.payload.rules || [];
                 state.leaves = result.payload.leaves || [];
+                state.oneDayAvailabilities = result.payload.one_day_availabilities || [];
                 state.occurrences = {};
+                state.oneDayOccurrences = {};
+                
+                // Expand weekly rules into occurrences
                 (result.payload.occurrences || []).forEach(function (occurrence) {
                     (state.occurrences[occurrence.date] = state.occurrences[occurrence.date] || [])
                         .push(occurrence);
+                });
+                
+                // Index one-day availability by date
+                state.oneDayAvailabilities.forEach(function (oneDay) {
+                    (state.oneDayOccurrences[oneDay.date] = state.oneDayOccurrences[oneDay.date] || [])
+                        .push(oneDay);
                 });
             }
             render();
@@ -380,7 +448,7 @@
     // Rendering
     // ------------------------------------------------------------------
     function haveAnyData() {
-        return state.rules.length > 0 || state.leaves.length > 0;
+        return state.rules.length > 0 || state.leaves.length > 0 || state.oneDayAvailabilities.length > 0;
     }
 
     function render() {
@@ -459,6 +527,12 @@
         return text;
     }
 
+    function oneDayChipLabel(oneDay) {
+        var text = compactTime(oneDay.start) + "–" + compactTime(oneDay.end) + " · one day";
+        if (!oneDay.is_active) text = "Inactive · " + text;
+        return text;
+    }
+
     function leaveChipLabel(leave) {
         return leave.reason ? "Leave: " + leave.reason : "On leave";
     }
@@ -469,6 +543,11 @@
         if (!start || !end) return false;
         return day >= start && day <= end;
     }
+    function isDoctorOnLeave(day) {
+    return state.leaves.some(function (leave) {
+        return leaveCovers(leave, day);
+    });
+}
 
     /* ----- Month view ------------------------------------------------- */
     function renderMonth() {
@@ -534,6 +613,15 @@
                 cls: occurrence.is_active ? "cc-event--availability" : "cc-event--inactive",
                 label: occurrenceChipLabel(occurrence),
                 onOpen: function () { openDetails("availability", occurrence.rule_id); },
+            }));
+        });
+
+        // Render one-day availability entries
+        (state.oneDayOccurrences[isoDate(day)] || []).forEach(function (oneDay) {
+            box.appendChild(makeEventButton({
+                cls: oneDay.is_active ? "cc-event--one-day" : "cc-event--inactive",
+                label: oneDayChipLabel(oneDay),
+                onOpen: function () { openDetails("one_day", oneDay.id); },
             }));
         });
 
@@ -628,39 +716,111 @@
     }
 
     function hourCell(hour, day, today) {
-        var cell = document.createElement("div");
-        cell.className = "cc-cell" + (isoDate(day) === isoDate(today) ? " cc-cell--today" : "");
-        cell.setAttribute("role", "button");
-        cell.setAttribute("tabindex", "0");
-        cell.setAttribute(
-            "aria-label",
-            isoDate(day) + " starting " + minutesToInput(hour * 60) +
-            ". Press to add availability or leave."
-        );
+    var cell = document.createElement("div");
 
+    cell.className =
+        "cc-cell" +
+        (isoDate(day) === isoDate(today) ? " cc-cell--today" : "");
+
+    cell.setAttribute("role", "button");
+    cell.setAttribute("tabindex", "0");
+
+    cell.setAttribute(
+        "aria-label",
+        isoDate(day) +
+        " starting " +
+        minutesToInput(hour * 60) +
+        ". Press to add availability or leave."
+    );
+
+    // Do not display recurring availability on a doctor's leave dates.
+    if (!isDoctorOnLeave(day)) {
         (state.occurrences[isoDate(day)] || []).forEach(function (occurrence) {
-            if (!startsInHour(occurrence.start, hour)) return;
-            var label = prettyTime(occurrence.start) + "–" + compactTime(occurrence.end) + " · weekly";
-            if (!occurrence.is_active) label = "Inactive · " + label;
-            cell.appendChild(makeEventButton({
-                cls: occurrence.is_active ? "cc-event--availability" : "cc-event--inactive",
-                label: label,
-                onOpen: function () { openDetails("availability", occurrence.rule_id); },
-            }));
+            if (!startsInHour(occurrence.start, hour)) {
+                return;
+            }
+
+            var label =
+                prettyTime(occurrence.start) +
+                "–" +
+                compactTime(occurrence.end) +
+                " · weekly";
+
+            if (!occurrence.is_active) {
+                label = "Inactive · " + label;
+            }
+
+            cell.appendChild(
+                makeEventButton({
+                    cls: occurrence.is_active
+                        ? "cc-event--availability"
+                        : "cc-event--inactive",
+                    label: label,
+                    onOpen: function () {
+                        openDetails("availability", occurrence.rule_id);
+                    },
+                })
+            );
         });
 
-        cell.addEventListener("click", function (event) {
-            if (event.target.closest(".cc-event")) return;
-            openMenu(new Date(day), hour * 60, (hour + 1) * 60);
-        });
-        cell.addEventListener("keydown", function (event) {
-            if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                openMenu(new Date(day), hour * 60, (hour + 1) * 60);
+        // Render one-day availability entries
+        (state.oneDayOccurrences[isoDate(day)] || []).forEach(function (oneDay) {
+            if (!startsInHour(oneDay.start, hour)) {
+                return;
             }
+
+            var oneDayLabel =
+                prettyTime(oneDay.start) +
+                "–" +
+                compactTime(oneDay.end) +
+                " · one day";
+
+            if (!oneDay.is_active) {
+                oneDayLabel = "Inactive · " + oneDayLabel;
+            }
+
+            cell.appendChild(
+                makeEventButton({
+                    cls: oneDay.is_active
+                        ? "cc-event--one-day"
+                        : "cc-event--inactive",
+                    label: oneDayLabel,
+                    onOpen: function () {
+                        openDetails("one_day", oneDay.id);
+                    },
+                })
+            );
         });
-        return cell;
     }
+
+    // Keep the cell interactive even when the doctor is on leave.
+    cell.addEventListener("click", function (event) {
+        if (event.target.closest(".cc-event")) {
+            return;
+        }
+
+        openMenu(
+            new Date(day),
+            hour * 60,
+            (hour + 1) * 60
+        );
+    });
+
+    cell.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+
+            openMenu(
+                new Date(day),
+                hour * 60,
+                (hour + 1) * 60
+            );
+        }
+    });
+
+    // IMPORTANT: Always return the cell, including on leave dates.
+    return cell;
+}
 
     function startsInHour(startValue, hour) {
         var minutes = parseTimeMinutes(startValue);
@@ -692,6 +852,7 @@
             end: document.getElementById("cc-availability-end"),
             slot: document.getElementById("cc-availability-slot"),
             active: document.getElementById("cc-availability-active"),
+            date: document.getElementById("cc-availability-date"),
         };
     }
 
@@ -712,26 +873,90 @@
             "Repeats weekly on " + label + " — this rule is NOT a single-date event.";
     }
 
-    function openAvailabilityForm(context, rule) {
-        var inputs = availabilityInputs();
-        if (rule) {
-            populateWeekdayOptions(Number(rule.weekday));
-        } else {
-            populateWeekdayOptions(weekdayIndex(context.date));
-        }
-        updateRepeatNote();
-
-        inputs.start.value = rule ? rule.start : minutesToInput(context.start);
-        inputs.end.value = rule ? rule.end : minutesToInput(context.end);
-        inputs.slot.value = rule && rule.slot_length_minutes !== null
-            ? String(rule.slot_length_minutes) : "";
-        inputs.active.checked = rule ? !!rule.is_active : true;
-
-        state.editing.availability = rule ? rule.id : null;
-        clearErrors(els.availabilityDialog);
+   function openAvailabilityForm(context, rule) {
+    // Prevent creating a new weekly availability rule from a leave date.
+    // Existing rules can still be edited.
+    if (
+        !rule &&
+        context &&
+        context.date &&
+        state.scheduleType === "weekly" &&
+        isDoctorOnLeave(context.date)
+    ) {
         closeMenu();
-        els.availabilityDialog.showModal();
+
+        status(
+            "This date is marked as doctor leave. " +
+            "Choose another date to add weekly availability.",
+            "error"
+        );
+
+        return;
     }
+
+    var inputs = availabilityInputs();
+    var dateInput = document.getElementById("cc-availability-date");
+    var weekdayLabel = document.querySelector("[data-label-weekday]");
+    var dateLabel = document.querySelector("[data-label-date]");
+    var weeklyNote = document.querySelector("[data-availability-note-weekly]");
+    var oneDayNote = document.querySelector("[data-availability-note-oneday]");
+
+    // Determine if this is weekly or one-day mode
+    var isOneDay = (state.scheduleType === "oneDay");
+
+    if (isOneDay) {
+        // One-day mode: show date, hide weekday
+        els.availabilityDialog.querySelector("h3").textContent = "One-day availability";
+        dateInput.hidden = false;
+        dateLabel.hidden = false;
+        dateInput.value = context && context.date ? isoDate(context.date) : isoDate(startOfToday());
+        els.weekdaySelect.hidden = true;
+        weekdayLabel.hidden = true;
+        els.repeatLabel.hidden = true;
+        weeklyNote.hidden = true;
+        oneDayNote.hidden = false;
+    } else {
+        // Weekly mode: show weekday, hide date
+        els.availabilityDialog.querySelector("h3").textContent = "Weekly availability";
+        dateInput.hidden = true;
+        dateLabel.hidden = true;
+        els.weekdaySelect.hidden = false;
+        weekdayLabel.hidden = false;
+        els.repeatLabel.hidden = false;
+        weeklyNote.hidden = false;
+        oneDayNote.hidden = true;
+
+        populateWeekdayOptions(
+            rule
+                ? rule.weekday
+                : context && context.date
+                ? weekdayIndex(context.date)
+                : weekdayIndex(startOfToday())
+        );
+        updateRepeatNote();
+    }
+
+    inputs.start.value = rule
+        ? rule.start
+        : context && context.start !== null
+        ? minutesToInput(context.start)
+        : "09:00";
+    inputs.end.value = rule
+        ? rule.end
+        : context && context.end !== null
+        ? minutesToInput(context.end)
+        : "13:00";
+    inputs.slot.value = rule && rule.slot_length_minutes !== null && rule.slot_length_minutes !== undefined
+        ? String(rule.slot_length_minutes)
+        : "";
+    inputs.active.checked = rule ? rule.is_active : true;
+
+    state.editing.availability = rule ? rule.id : null;
+    clearErrors(els.availabilityDialog);
+    closeMenu();
+    els.availabilityDialog.showModal();
+}
+    var inputs = availabilityInputs();
 
     // -- Leave form ----------------------------------------------------
     function leaveInputs() {
@@ -786,27 +1011,50 @@
     // -- Submissions ---------------------------------------------------
     function submitAvailability() {
         var inputs = availabilityInputs();
+        var isOneDay = (state.scheduleType === "oneDay");
+        
         if (!inputs.start.value || !inputs.end.value) {
             showErrors(els.availabilityDialog, {
                 errors: { "__all__": ["Start and end time are required."] },
             });
             return;
         }
+        
+        if (isOneDay && !inputs.date.value) {
+            showErrors(els.availabilityDialog, {
+                errors: { "__all__": ["Date is required for one-day availability."] },
+            });
+            return;
+        }
+        
         if (state.unsaved) {
+            // Draft mode handling
             var draftId = state.editing.availability;
+            var draftKind = isOneDay ? "one_day" : "availability";
+            
             if (draftId !== null) {
-                var current = findDraft("availability", draftId);
+                var current = findDraft(draftKind, draftId);
                 els.availabilityDialog.close();
                 hideDetails();
                 state.editing.availability = null;
+                
                 if (current) {
-                    current.weekday = Number(inputs.weekday.value);
-                    current.weekday_label = WEEKDAY_LABELS[current.weekday];
-                    current.start = inputs.start.value;
-                    current.end = inputs.end.value;
-                    current.slot_length_minutes = inputs.slot.value
-                        ? Number(inputs.slot.value) : null;
-                    current.is_active = inputs.active.checked;
+                    if (isOneDay) {
+                        current.date = inputs.date.value;
+                        current.start = inputs.start.value;
+                        current.end = inputs.end.value;
+                        current.slot_length_minutes = inputs.slot.value
+                            ? Number(inputs.slot.value) : null;
+                        current.is_active = inputs.active.checked;
+                    } else {
+                        current.weekday = Number(inputs.weekday.value);
+                        current.weekday_label = WEEKDAY_LABELS[current.weekday];
+                        current.start = inputs.start.value;
+                        current.end = inputs.end.value;
+                        current.slot_length_minutes = inputs.slot.value
+                            ? Number(inputs.slot.value) : null;
+                        current.is_active = inputs.active.checked;
+                    }
                     status("Draft updated. It is saved with the doctor form.", "ok");
                 } else {
                     status("That draft is no longer listed.", "error");
@@ -814,45 +1062,86 @@
                 loadEvents();
                 return;
             }
-            state.draftRules.push(draftRuleEntry(
-                Number(inputs.weekday.value),
-                inputs.start.value,
-                inputs.end.value,
-                inputs.slot.value ? Number(inputs.slot.value) : null,
-                inputs.active.checked,
-                draftIdCounter()
-            ));
+            
+            // Create new draft
+            if (isOneDay) {
+                state.draftOneDayRules.push(draftOneDayEntry(
+                    inputs.date.value,
+                    inputs.start.value,
+                    inputs.end.value,
+                    inputs.slot.value ? Number(inputs.slot.value) : null,
+                    inputs.active.checked,
+                    draftIdCounter()
+                ));
+            } else {
+                state.draftRules.push(draftRuleEntry(
+                    Number(inputs.weekday.value),
+                    inputs.start.value,
+                    inputs.end.value,
+                    inputs.slot.value ? Number(inputs.slot.value) : null,
+                    inputs.active.checked,
+                    draftIdCounter()
+                ));
+            }
+            
             els.availabilityDialog.close();
             state.editing.availability = null;
             status("Draft added — it is saved together with the new doctor.", "ok");
             loadEvents();
             return;
         }
+        
+        // Server submission
         var editingId = state.editing.availability;
-        var url = editingId ? scheduleUrl("availability", "update", editingId) : scopedUrl(createUrls.availability);
-        setDialogBusy(els.availabilityDialog, true);
-        var payload = {
-            weekday: inputs.weekday.value,
-            start_time: inputs.start.value,
-            end_time: inputs.end.value,
-            slot_length_minutes: inputs.slot.value || "",
-        };
+        var url;
+        var payload;
+        
+        if (isOneDay) {
+            url = editingId ? scheduleUrl("oneDay", "update", editingId) : scopedUrl(createUrls.oneDay);
+            payload = {
+                date: inputs.date.value,
+                start_time: inputs.start.value,
+                end_time: inputs.end.value,
+                slot_length_minutes: inputs.slot.value || "",
+            };
+        } else {
+            url = editingId ? scheduleUrl("availability", "update", editingId) : scopedUrl(createUrls.availability);
+            payload = {
+                weekday: inputs.weekday.value,
+                start_time: inputs.start.value,
+                end_time: inputs.end.value,
+                slot_length_minutes: inputs.slot.value || "",
+            };
+        }
+        
         if (inputs.active.checked) payload.is_active = "on";
+        
+        setDialogBusy(els.availabilityDialog, true);
         postForm(url, payload).then(function (result) {
             if (!result) return;
             if (result.ok) {
                 els.availabilityDialog.close();
                 hideDetails();
                 state.editing.availability = null;
-                if (result.payload && result.payload.rule) {
+                
+                if (isOneDay && result.payload && result.payload.availability) {
+                    // One-day availability doesn't mirror to inline (not part of original design)
+                    status(
+                        editingId
+                            ? "One-day availability updated."
+                            : "One-day availability added for " + payload.date + ".",
+                        "ok"
+                    );
+                } else if (result.payload && result.payload.rule) {
                     mirrorRuleIntoInline(result.payload.rule);
+                    status(
+                        editingId
+                            ? "Availability updated (still repeating weekly)."
+                            : "Availability added — it repeats weekly.",
+                        "ok"
+                    );
                 }
-                status(
-                    editingId
-                        ? "Availability updated (still repeating weekly)."
-                        : "Availability added — it repeats weekly.",
-                    "ok"
-                );
+                
                 loadEvents();
             } else {
                 showErrors(els.availabilityDialog, result.payload);
@@ -924,11 +1213,19 @@
         return state.leaves.find(function (leave) { return String(leave.id) === String(id); });
     }
 
+    function findOneDay(id) {
+        return state.oneDayAvailabilities.find(function (oneDay) { return String(oneDay.id) === String(id); });
+    }
+
     function openDetails(kind, id) {
         var rule = kind === "availability" ? findRule(id) : null;
         var leave = kind === "leave" ? findLeave(id) : null;
+        var oneDay = kind === "one_day" ? findOneDay(id) : null;
+        
         if (kind === "availability" && !rule) return;
         if (kind === "leave" && !leave) return;
+        if (kind === "one_day" && !oneDay) return;
+        
         state.selected = { kind: kind, id: id };
 
         if (rule) {
@@ -952,6 +1249,27 @@
             toggle.hidden = false;
             toggle.dataset.actionValue = rule.is_active ? "off" : "on";
             toggle.textContent = rule.is_active ? "Deactivate" : "Activate";
+        } else if (oneDay) {
+            els.detailsTitle.textContent = "One-day availability";
+            fillDetails([
+                ["Date", oneDay.date],
+                ["Time", prettyTime(oneDay.start) + " – " + compactTime(oneDay.end)],
+                [
+                    "Slot duration",
+                    oneDay.slot_length_minutes === null || oneDay.slot_length_minutes === undefined
+                        ? (oneDay.effective_slot_length_minutes
+                            ? "Doctor default (" + oneDay.effective_slot_length_minutes + " min)"
+                            : "Doctor default")
+                        : oneDay.slot_length_minutes + " min",
+                ],
+                ["Scope", "This specific date only (does not repeat)"],
+                ["State", oneDay.is_active ? "Active (bookable)" : "Inactive (not bookable)"],
+            ]);
+            els.detailsNote.hidden = true;
+            var oneDayToggle = els.detailsDialog.querySelector("[data-details='toggle']");
+            oneDayToggle.hidden = false;
+            oneDayToggle.dataset.actionValue = oneDay.is_active ? "off" : "on";
+            oneDayToggle.textContent = oneDay.is_active ? "Deactivate" : "Activate";
         } else {
             var start = dateFromIso(leave.start_date);
             var end = dateFromIso(leave.end_date);
@@ -1000,8 +1318,18 @@
         hideDetails();
         if (target.kind === "availability") {
             var rule = findRule(target.id);
-            if (rule) openAvailabilityForm({ date: startOfToday() }, rule);
+            if (rule) {
+                state.scheduleType = "weekly";
+                openAvailabilityForm({ date: startOfToday() }, rule);
+            }
             else status("That availability rule is no longer listed.", "error");
+        } else if (target.kind === "one_day") {
+            var oneDay = findOneDay(target.id);
+            if (oneDay) {
+                state.scheduleType = "oneDay";
+                openAvailabilityForm({ date: dateFromIso(oneDay.date) }, oneDay);
+            }
+            else status("That one-day availability is no longer listed.", "error");
         } else {
             var leave = findLeave(target.id);
             if (leave) openLeaveForm(leave);
@@ -1460,6 +1788,13 @@
         button.addEventListener("click", function () {
             var action = button.getAttribute("data-menu");
             if (action === "availability") {
+                state.scheduleType = "weekly";
+                openAvailabilityForm(
+                    state.context || { date: startOfToday(), start: 9 * 60, end: 13 * 60 },
+                    null
+                );
+            } else if (action === "oneDay") {
+                state.scheduleType = "oneDay";
                 openAvailabilityForm(
                     state.context || { date: startOfToday(), start: 9 * 60, end: 13 * 60 },
                     null
@@ -1522,6 +1857,7 @@
         loadEvents();
     });
     root.querySelector("[data-action='add-availability']").addEventListener("click", function () {
+        state.scheduleType = "weekly";
         openAvailabilityForm({ date: startOfToday(), start: 9 * 60, end: 13 * 60 }, null);
     });
     root.querySelector("[data-action='add-leave']").addEventListener("click", function () {

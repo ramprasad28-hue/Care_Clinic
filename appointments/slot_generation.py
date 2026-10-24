@@ -1,7 +1,8 @@
 """Reusable slot-generation service.
 
 Materializes concrete :class:`~appointments.models.AppointmentSlot` rows from
-``clinic.AvailabilityRule`` windows for a rolling date range.
+both ``clinic.AvailabilityRule`` (weekly recurring) and ``clinic.OneDayAvailability``
+(date-specific) windows for a rolling date range.
 
 Guarantees (see Task 2 of the Phase 5 brief):
 
@@ -9,7 +10,8 @@ Guarantees (see Task 2 of the Phase 5 brief):
   "past" is evaluated correctly.
 * Respects each rule's ``weekday``, ``start_time``, ``end_time`` and
   ``effective_slot_length_minutes`` (rule override, else doctor default).
-* Never emits a slot that extends past the rule's end time.
+* Respects one-day availability for specific dates with the same properties.
+* Never emits a slot that extends past the availability window's end time.
 * Excludes dates covered by ``clinic.DoctorLeave``.
 * Excludes slots that have already started (past intervals) by default.
 * Is idempotent: re-running never creates duplicate slots (unique constraint +
@@ -26,7 +28,7 @@ from datetime import date, datetime, time, timedelta
 from django.db import IntegrityError
 from django.utils import timezone
 
-from clinic.models import AvailabilityRule, Doctor, DoctorLeave
+from clinic.models import AvailabilityRule, Doctor, DoctorLeave, OneDayAvailability
 
 from .models import AppointmentSlot
 
@@ -43,6 +45,7 @@ def _rule_intervals(rule, day):
     """Yield ``(start_time, end_time)`` intervals for one rule on one day.
 
     Returns nothing for an invalid window (end <= start or non-positive length).
+    Works for both AvailabilityRule and OneDayAvailability objects.
     """
     length = rule.effective_slot_length_minutes
     if not length or length <= 0:
@@ -94,12 +97,16 @@ def generate_slots_for_doctor(
 ):
     """Create missing slots for ``doctor`` across ``[start_date, end_date]``.
 
+    Considers both weekly recurring availability rules and date-specific
+    one-day availability records.
+
     Returns a summary dict: ``{"created", "existing", "considered"}``.
     """
     now = now or timezone.now()
     if end_date < start_date:
         start_date, end_date = end_date, start_date
 
+    # Gather weekly availability rules by weekday
     rules_by_weekday = defaultdict(list)
     rules = (
         AvailabilityRule.objects.filter(doctor=doctor, is_active=True)
@@ -109,6 +116,20 @@ def generate_slots_for_doctor(
     for rule in rules:
         rules_by_weekday[rule.weekday].append(rule)
 
+    # Gather one-day availability records within the date range
+    one_day_by_date = {}
+    one_day_records = (
+        OneDayAvailability.objects.filter(
+            doctor=doctor,
+            date__range=(start_date, end_date),
+            is_active=True,
+        )
+        .select_related("doctor")
+        .order_by("start_time", "end_time")
+    )
+    for record in one_day_records:
+        one_day_by_date.setdefault(record.date, []).append(record)
+
     leave_dates = _leave_dates(doctor, start_date, end_date)
 
     candidates = []  # (date, start_time, end_time)
@@ -116,8 +137,16 @@ def generate_slots_for_doctor(
     while day <= end_date:
         if day not in leave_dates:
             intervals = []
+            
+            # Add intervals from weekly recurring rules
             for rule in rules_by_weekday.get(day.weekday(), []):
                 intervals.extend(_rule_intervals(rule, day))
+            
+            # Add intervals from one-day availability for this specific date
+            for one_day_rule in one_day_by_date.get(day, []):
+                intervals.extend(_rule_intervals(one_day_rule, day))
+            
+            # De-duplicate and sort intervals
             for start_time, end_time in _non_overlapping(intervals):
                 if not include_past and _aware(day, start_time) <= now:
                     continue

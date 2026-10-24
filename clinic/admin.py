@@ -21,6 +21,7 @@ from datetime import date, timedelta
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.forms.models import BaseInlineFormSet
 from django.http import Http404, HttpResponseNotAllowed, HttpResponseRedirect, JsonResponse
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -33,7 +34,7 @@ from .forms import (
     DoctorLeaveForm,
     SpecialityAdminForm,
 )
-from .models import AvailabilityRule, Doctor, DoctorLeave, Speciality, Weekday
+from .models import AvailabilityRule, Doctor, DoctorLeave, OneDayAvailability, Speciality, Weekday
 
 User = get_user_model()
 
@@ -170,12 +171,70 @@ class AdministratorOnlyInline:
         return self._inline_allowed(request, obj)
 
 
+class AvailabilityRuleInlineFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+
+        # Track availability rules that would already have been saved
+        # before Django reaches the next inline row.
+        previous_active_rules = []
+
+        for form in self.forms:
+            # Skip invalid forms; their individual errors should be displayed.
+            if not hasattr(form, "cleaned_data") or form.errors:
+                continue
+
+            data = form.cleaned_data
+
+            # Ignore empty rows and rows marked for deletion.
+            if not data or data.get("DELETE", False):
+                continue
+
+            if getattr(form, "empty_permitted", False) and not form.has_changed():
+                continue
+
+            weekday = data.get("weekday")
+            start_time = data.get("start_time")
+            end_time = data.get("end_time")
+            is_active = data.get("is_active", True)
+
+            # Skip incomplete rows; the individual form handles validation.
+            if weekday is None or start_time is None or end_time is None:
+                continue
+
+            # Match the existing model validation: a new window conflicts
+            # with an earlier active window on the same weekday when their
+            # time ranges overlap.
+            for previous in previous_active_rules:
+                same_weekday = previous["weekday"] == weekday
+                overlaps = (
+                    start_time < previous["end_time"]
+                    and end_time > previous["start_time"]
+                )
+
+                if same_weekday and overlaps:
+                    raise ValidationError(
+                        "Availability windows for the same weekday "
+                        "cannot overlap. Please correct the schedule "
+                        "before saving the doctor."
+                    )
+
+            # Only active rules are considered existing conflicting rules,
+            # matching the model's existing database query.
+            if is_active:
+                previous_active_rules.append(
+                    {
+                        "weekday": weekday,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                    }
+                )
+
 class AvailabilityRuleInline(AdministratorOnlyInline, admin.TabularInline):
     model = AvailabilityRule
+    formset = AvailabilityRuleInlineFormSet
     extra = 1
     fields = ("weekday", "start_time", "end_time", "slot_length_minutes", "is_active")
-
-
 class DoctorLeaveInline(AdministratorOnlyInline, admin.TabularInline):
     model = DoctorLeave
     extra = 1
@@ -262,6 +321,20 @@ def _leave_to_dict(leave):
         "reason": leave.reason,
     }
 
+def _one_day_to_dict(availability):
+    """JSON representation of a one-day availability record."""
+    return {
+        "kind": "one_day_availability",
+        "id": availability.pk,
+        "date": availability.date.isoformat(),
+        "start": _time_str(availability.start_time),
+        "end": _time_str(availability.end_time),
+        "slot_length_minutes": availability.slot_length_minutes,
+        "effective_slot_length_minutes": (
+            availability.effective_slot_length_minutes
+        ),
+        "is_active": availability.is_active,
+    }
 
 def _availability_occurrences(rules, start_date, end_date):
     """Materialize one occurrence per matching weekday in ``[start, end]``.
@@ -387,6 +460,22 @@ class DoctorAdmin(ImageWarningAdminMixin, AdministratorOnlyMixin, admin.ModelAdm
                 self.admin_site.admin_view(self.schedule_leave_delete_view),
                 name=f"{info[0]}_{info[1]}_schedule_leave_delete",
             ),
+
+            path(
+                "<int:object_id>/schedule/one-day/create/",
+                self.admin_site.admin_view(self.schedule_one_day_create_view),
+                name=f"{info[0]}_{info[1]}_schedule_one_day_create",
+            ),
+            path(
+                "<int:object_id>/schedule/one-day/<int:availability_id>/update/",
+                self.admin_site.admin_view(self.schedule_one_day_update_view),
+                name=f"{info[0]}_{info[1]}_schedule_one_day_update",
+            ),
+            path(
+                "<int:object_id>/schedule/one-day/<int:availability_id>/delete/",
+                self.admin_site.admin_view(self.schedule_one_day_delete_view),
+                name=f"{info[0]}_{info[1]}_schedule_one_day_delete",
+            ),
             *url_patterns,
         ]
 
@@ -435,6 +524,12 @@ class DoctorAdmin(ImageWarningAdminMixin, AdministratorOnlyMixin, admin.ModelAdm
                 doctor=doctor, start_date__lte=end, end_date__gte=start
             )
         )
+        one_day_availabilities = list(
+        OneDayAvailability.objects.filter(
+        doctor=doctor,
+        date__range=(start, end),
+    )
+)
         return JsonResponse(
             {
                 "doctor": {
@@ -449,6 +544,7 @@ class DoctorAdmin(ImageWarningAdminMixin, AdministratorOnlyMixin, admin.ModelAdm
                 "rules": [_rule_to_dict(rule) for rule in rules],
                 # Date-specific leave ranges (inclusive).
                 "leaves": [_leave_to_dict(leave) for leave in leaves],
+                "one_day_availabilities": [_one_day_to_dict(item) for item in one_day_availabilities],
             }
         )
 
@@ -503,6 +599,121 @@ class DoctorAdmin(ImageWarningAdminMixin, AdministratorOnlyMixin, admin.ModelAdm
         return JsonResponse({"status": "ok"})
 
     # -- DoctorLeave ---------------------------------------------------
+        # -- OneDayAvailability --------------------------------------------
+
+    def _one_day_by_doctor(self, doctor, availability_id):
+        availability = OneDayAvailability.objects.filter(
+            doctor=doctor,
+            pk=availability_id,
+        ).first()
+
+        if availability is None:
+            raise Http404(
+                "No one-day availability record found for this doctor."
+            )
+
+        return availability
+
+    def schedule_one_day_create_view(self, request, object_id):
+        if (
+            response := self._method_gate(request, ("POST",))
+        ) is not None:
+            return response
+
+        doctor = self._schedule_gate(request, object_id)
+        form = OneDayAvailabilityForm(request.POST)
+
+        if form.is_valid():
+            availability = form.save(commit=False)
+            availability.doctor = doctor
+
+            try:
+                availability.save()
+            except ValidationError as exc:
+                return JsonResponse(
+                    {"errors": exc.message_dict},
+                    status=400,
+                )
+
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "availability": _one_day_to_dict(availability),
+                },
+                status=201,
+            )
+
+        return JsonResponse(
+            {"errors": dict(form.errors)},
+            status=400,
+        )
+
+    def schedule_one_day_update_view(
+        self,
+        request,
+        object_id,
+        availability_id,
+    ):
+        if (
+            response := self._method_gate(request, ("POST",))
+        ) is not None:
+            return response
+
+        doctor = self._schedule_gate(request, object_id)
+        availability = self._one_day_by_doctor(
+            doctor,
+            availability_id,
+        )
+
+        form = OneDayAvailabilityForm(
+            request.POST,
+            instance=availability,
+        )
+
+        if form.is_valid():
+            availability = form.save(commit=False)
+
+            try:
+                availability.save()
+            except ValidationError as exc:
+                return JsonResponse(
+                    {"errors": exc.message_dict},
+                    status=400,
+                )
+
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "availability": _one_day_to_dict(availability),
+                }
+            )
+
+        return JsonResponse(
+            {"errors": dict(form.errors)},
+            status=400,
+        )
+
+    def schedule_one_day_delete_view(
+        self,
+        request,
+        object_id,
+        availability_id,
+    ):
+        if (
+            response := self._method_gate(request, ("POST",))
+        ) is not None:
+            return response
+
+        doctor = self._schedule_gate(request, object_id)
+        availability = self._one_day_by_doctor(
+            doctor,
+            availability_id,
+        )
+
+        availability.delete()
+
+        return JsonResponse({"status": "ok"})
+    
     def _leave_by_doctor(self, doctor, leave_id):
         leave = DoctorLeave.objects.filter(doctor=doctor, pk=leave_id).first()
         if leave is None:
